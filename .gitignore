@@ -1,0 +1,28 @@
+﻿# Python
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Data / uploads
+backend/data/*
+!backend/data/.gitkeep
+
+# Env
+.env
+backend/.env
+venv/
+__pycache__/
+node_modules/
+
+# Node
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Next.js dashboard
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/next-env.d.ts
