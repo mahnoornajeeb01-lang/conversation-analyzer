@@ -9,9 +9,10 @@ import threading
 import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Generator, Iterator, List, Optional, Tuple, TypeVar
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -255,6 +256,32 @@ def _event(payload: dict) -> bytes:
     return (json.dumps(payload) + "\n").encode("utf-8")
 
 
+T = TypeVar("T")
+
+# Proxies in front of the server (e.g. a Cloudflare tunnel) drop a response that sends
+# nothing for ~100 s, and a long recording can take longer than that per stage.
+HEARTBEAT_SECONDS = 15.0
+
+
+def _with_heartbeat(fn: Callable[[], T]) -> Generator[bytes, None, T]:
+    """Run fn on its own thread, yielding a blank line (ignored by the client) every
+    HEARTBEAT_SECONDS until it finishes; returns fn's result via `yield from`."""
+    future: Future = Future()
+
+    def target() -> None:
+        try:
+            future.set_result(fn())
+        except BaseException as exc:
+            future.set_exception(exc)
+
+    threading.Thread(target=target, name="stream-stage", daemon=True).start()
+    while True:
+        try:
+            return future.result(timeout=HEARTBEAT_SECONDS)
+        except FutureTimeout:
+            yield b"\n"
+
+
 @app.post("/api/analyze/stream")
 async def analyze_audio_stream(
     file: UploadFile = File(...), language: Optional[str] = Form(None)
@@ -277,11 +304,11 @@ async def analyze_audio_stream(
         try:
             yield _event({"stage": "transcribing"})
             pipeline = _Pipeline(temp_path, filename, language)
-            transcript = pipeline.transcribe()
+            transcript = yield from _with_heartbeat(pipeline.transcribe)
             yield _event({"stage": "transcript", "transcript": transcript.model_dump()})
 
             yield _event({"stage": "analyzing"})
-            report = pipeline.analyze(transcript)
+            report = yield from _with_heartbeat(lambda: pipeline.analyze(transcript))
             yield _event({"stage": "report", "report": report.model_dump()})
         except HTTPException as exc:
             if pipeline:
