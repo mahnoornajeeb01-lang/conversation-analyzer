@@ -32,6 +32,10 @@ class Settings(BaseSettings):
 
     # CORS
     allowed_origins: List[str] = ["http://localhost:3000"]
+    # The dashboard on Vercel: its production aliases and every deployment URL of this project.
+    allowed_origin_regex: str = (
+        r"https://conversation-analyzer-(iota-umber|mahnoornajeeb01-2303|[a-z0-9]+-mahnoornajeeb01-2303)\.vercel\.app"
+    )
 
     # The dashboard's static build (`npm run build` in frontend/). When present it is
     # served at "/", so one address (e.g. a Cloudflare tunnel) gives the whole app.

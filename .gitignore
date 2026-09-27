@@ -28,7 +28,10 @@ frontend/.env*.local
 frontend/out/
 frontend/next-env.d.ts
 
-# Logs / build caches / stray test output
+# Logs / build caches / stray test output (includes share-link.log)
 *.log
 *.tsbuildinfo
 backend/System.Speech.Synthesis.SpeechSynthesizer
+
+# share.bat output
+share-link.txt

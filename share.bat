@@ -1,27 +1,8 @@
 @echo off
-rem Start the analyzer and a public Cloudflare link to it (free, no account needed).
-rem Send the https://....trycloudflare.com address printed below to anyone who should use it.
-rem It works while this window stays open; a new link is created each time you run this.
-cd /d "%~dp0"
-
-if not exist "frontend\out\index.html" (
-  echo Building the website first...
-  pushd frontend
-  call npm run build || (popd & echo Build failed. & pause & exit /b 1)
-  popd
-)
-
-set "CLOUDFLARED=%USERPROFILE%\tools\cloudflared.exe"
-if not exist "%CLOUDFLARED%" set "CLOUDFLARED=cloudflared"
-
-start "Conversation Analyzer backend" cmd /k backend\start.bat
-echo Waiting for the backend to start...
-timeout /t 15 /nobreak >nul
-
-echo.
-echo ================================================================
-echo  Look for the line with  https://....trycloudflare.com  below
-echo  and share that link. Keep this window open.
-echo ================================================================
-echo.
-"%CLOUDFLARED%" tunnel --url http://localhost:8000 --no-autoupdate
+rem Double-click to start the analysis server on this PC and get a link to share.
+rem The link opens the Vercel site, which sends recordings to this PC for analysis.
+rem It works while the backend and tunnel windows stay open and the PC is awake;
+rem running this again replaces the previous run and creates a new link.
+rem Full path: PowerShell isn't always on PATH.
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0share.ps1"
+pause

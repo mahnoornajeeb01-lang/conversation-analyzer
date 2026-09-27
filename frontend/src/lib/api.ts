@@ -1,8 +1,39 @@
 import type { AnalysisReport, StreamEvent } from "./types";
 
-/** Empty = same origin: the production build is served by the backend itself.
- *  `next dev` sets it to http://localhost:8000 via .env.development.local. */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+/**
+ * Where the analysis server is, decided at request time:
+ * 1. `?server=https://….trycloudflare.com` in the page link (the Vercel site; share.bat
+ *    prints this link), so a new tunnel address never needs a rebuild;
+ * 2. NEXT_PUBLIC_API_BASE_URL (`next dev` sets http://localhost:8000 via .env.development.local);
+ * 3. otherwise the same origin, for the copy of the site the backend serves itself.
+ */
+export function apiBase(): string {
+  if (typeof window !== "undefined") {
+    const fromLink = new URLSearchParams(window.location.search).get("server");
+    if (fromLink && isAllowedServer(fromLink)) return new URL(fromLink).origin;
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+}
+
+/** Only the addresses a share link can legitimately use, so a crafted link can't send
+ *  someone's recording to an arbitrary server. */
+function isAllowedServer(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "https:" && u.hostname.endsWith(".trycloudflare.com")) return true;
+    return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1");
+  } catch {
+    return false;
+  }
+}
+
+function unreachable(base: string): Error {
+  return new Error(
+    base
+      ? `Could not reach the analysis server at ${base}. The link may have expired; ask for a new one.`
+      : "This page isn't connected to an analysis server. Open it with the full share link (it ends in ?server=…).",
+  );
+}
 
 /**
  * Upload a recording and stream pipeline events back as they happen:
@@ -15,21 +46,24 @@ export async function analyzeRecording(
 ): Promise<void> {
   const body = new FormData();
   body.append("file", file);
+  const base = apiBase();
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/analyze/stream`, {
+    response = await fetch(`${base}/api/analyze/stream`, {
       method: "POST",
       body,
       signal,
     });
   } catch (err) {
     if ((err as Error).name === "AbortError") throw err;
-    throw new Error(
-      `Could not reach the analysis server${API_BASE_URL ? ` at ${API_BASE_URL}` : ""}. Is the backend running?`,
-    );
+    throw unreachable(base);
   }
 
+  // No server: the Vercel host has no /api route. Tunnel errors (e.g. 530) mean the PC is off.
+  if ((!base && (response.status === 404 || response.status === 405)) || response.status === 530) {
+    throw unreachable(base);
+  }
   if (!response.ok || !response.body) {
     let detail = `Request failed (${response.status}).`;
     try {
@@ -65,15 +99,16 @@ export async function analyzeRecording(
 
 /** Render the finished report as a PDF on the server and save it. */
 export async function downloadReportPdf(report: AnalysisReport): Promise<void> {
+  const base = apiBase();
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/report/pdf`, {
+    response = await fetch(`${base}/api/report/pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),
     });
   } catch {
-    throw new Error(`Could not reach the analysis server${API_BASE_URL ? ` at ${API_BASE_URL}` : ""}.`);
+    throw unreachable(base);
   }
   if (!response.ok) {
     let detail = `PDF export failed (${response.status}).`;
