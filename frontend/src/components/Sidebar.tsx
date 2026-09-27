@@ -1,23 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  AudioLines,
-  FileText,
-  LayoutDashboard,
-  Lock,
-  LoaderCircle,
-  Smile,
-  Timer,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { AudioLines, LayoutDashboard, Lock, LoaderCircle, Timer, Zap, type LucideIcon } from "lucide-react";
 
-import { EMOTION_SOURCE } from "@/lib/format";
-import { languageName } from "@/lib/languages";
-import type { AnalysisReport, Transcript } from "@/lib/types";
+import type { AnalysisReport } from "@/lib/types";
 
-export type View = "overview" | "transcript" | "latency" | "interruptions" | "emotions";
+export type View = "overview" | "latency" | "interruptions";
 
 interface NavItem {
   key: View;
@@ -29,42 +17,30 @@ interface NavItem {
 const OVERVIEW: NavItem = { key: "overview", label: "Overview", hint: "Upload & summary", icon: LayoutDashboard };
 
 const LAYERS: NavItem[] = [
-  { key: "transcript", label: "Speech-to-Text", hint: "Full transcript", icon: FileText },
   { key: "latency", label: "Response Latency", hint: "Gaps between turns", icon: Timer },
   { key: "interruptions", label: "Interruptions", hint: "Overlaps & floor-taking", icon: Zap },
-  { key: "emotions", label: "Emotions", hint: "Tone of each speaker", icon: Smile },
 ];
 
 export default function Sidebar({
   view,
   onNavigate,
   report,
-  transcript,
   busy,
 }: {
   view: View;
   onNavigate: (view: View) => void;
   report: AnalysisReport | null;
-  transcript: Transcript | null;
   busy: boolean;
 }) {
-  const available = (key: View) => {
-    if (key === "overview") return true;
-    if (key === "transcript") return Boolean(transcript || report);
-    return Boolean(report);
-  };
+  const available = (key: View) => key === "overview" || Boolean(report);
 
   const badge = (key: View): string | null => {
-    if (!report) return key === "transcript" && transcript ? String(transcript.segments.length) : null;
+    if (!report) return null;
     switch (key) {
-      case "transcript":
-        return String(report.transcript?.segments.length ?? 0);
       case "latency":
         return `${report.latency_stats.average.toFixed(1)}s`;
       case "interruptions":
         return String(report.interruption_count);
-      case "emotions":
-        return report.emotions ? String(report.emotions.length) : "—";
       default:
         return null;
     }
@@ -166,7 +142,7 @@ export default function Sidebar({
         </motion.div>
         <div>
           <p className="text-[15px] font-bold tracking-tight text-white">Conversation Analyzer</p>
-          <p className="text-xs text-slate-400">Speech intelligence dashboard</p>
+          <p className="text-xs text-slate-400">Turn-taking &amp; timing</p>
         </div>
       </div>
 
@@ -203,14 +179,6 @@ export default function Sidebar({
             />
             Diarization: {report.diarization_source === "mock" ? "simulated" : "pyannote 3.1"}
           </div>
-          {report.transcript && (
-            <div className="mt-1 pl-3.5">
-              Whisper {report.transcript.model} · {languageName(report.transcript.language)}
-            </div>
-          )}
-          {report.emotion_source && (
-            <div className="mt-1 pl-3.5">Emotions: {EMOTION_SOURCE[report.emotion_source].sidebar}</div>
-          )}
         </div>
       )}
     </aside>

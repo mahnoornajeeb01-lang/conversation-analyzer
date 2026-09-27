@@ -13,6 +13,7 @@ from app.models.schema import (
     LatencyEvent,
     LatencyStats,
     OverlapEvent,
+    SpeakerProfile,
     SpeakerSegment,
 )
 
@@ -173,6 +174,19 @@ def detect_interruptions(
     return interruptions
 
 
+def build_speaker_profiles(segments: List[SpeakerSegment], speakers: List[str]) -> List[SpeakerProfile]:
+    """Talk time, share of all speech and number of turns for each speaker."""
+    total_talk = sum(s.end - s.start for s in segments) or 1.0
+    profiles: List[SpeakerProfile] = []
+    for speaker in speakers:
+        own = [s for s in segments if s.speaker == speaker]
+        talk = sum(s.end - s.start for s in own)
+        profiles.append(
+            SpeakerProfile(speaker=speaker, talk_time=round(talk, 3), talk_share=round(talk / total_talk, 4), turns=len(own))
+        )
+    return profiles
+
+
 def generate_report(
     segments: List[SpeakerSegment],
     filename: str,
@@ -213,4 +227,5 @@ def generate_report(
         successful_interruption_count=successful_count,
         backchannel_count=backchannel_count,
         diarization_source=diarization_source,  # type: ignore[arg-type]
+        speaker_profiles=build_speaker_profiles(ordered, speakers),
     )

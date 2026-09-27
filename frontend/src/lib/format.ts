@@ -1,6 +1,4 @@
-import { Angry, Frown, Meh, Smile, Sparkles, Zap, type LucideIcon } from "lucide-react";
-
-import type { AnalysisReport, Emotion } from "./types";
+import type { AnalysisReport } from "./types";
 
 export function formatClock(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return "0:00";
@@ -60,12 +58,10 @@ export function buildSpeakerMeta(report: AnalysisReport | null): Record<string, 
   const map: Record<string, SpeakerMeta> = {};
   if (!report) return map;
   report.speakers.forEach((label, index) => {
-    const profile = report.speaker_profiles?.find((p) => p.speaker === label);
-    const name = profile?.display_name ?? label;
     map[label] = {
       label,
-      name,
-      initials: initialsOf(name),
+      name: label,
+      initials: initialsOf(label),
       color: SPEAKER_COLORS[index % SPEAKER_COLORS.length],
       index,
     };
@@ -77,40 +73,3 @@ export function speakerName(meta: Record<string, SpeakerMeta>, label: string | n
   if (!label) return "Unknown";
   return meta[label]?.name ?? label;
 }
-
-/**
- * Emotion families in stacking order. Colours are CSS variables (see globals.css) whose
- * light and dark steps were each checked with the dataviz palette validator; some sit
- * below 3:1 on their surface, so every emotion chart also carries text labels/percentages.
- */
-export const EMOTION_ORDER: Emotion[] = ["surprise", "joy", "fear", "sadness", "anger", "neutral"];
-
-export const EMOTION_META: Record<Emotion, { label: string; color: string; icon: LucideIcon }> = {
-  surprise: { label: "Surprise", color: "var(--emo-surprise)", icon: Sparkles },
-  joy: { label: "Joy", color: "var(--emo-joy)", icon: Smile },
-  fear: { label: "Fear", color: "var(--emo-fear)", icon: Zap },
-  sadness: { label: "Sadness", color: "var(--emo-sadness)", icon: Frown },
-  anger: { label: "Anger", color: "var(--emo-anger)", icon: Angry },
-  neutral: { label: "Neutral", color: "var(--emo-neutral)", icon: Meh },
-};
-
-type EmotionSource = NonNullable<AnalysisReport["emotion_source"]>;
-
-/** How each emotion source is described in the dashboard. */
-export const EMOTION_SOURCE: Record<EmotionSource, { from: string; sidebar: string; note: string }> = {
-  combined: {
-    from: "tone of voice and the words spoken",
-    sidebar: "voice + text",
-    note: "Emotions combine each speaker's voice (pitch, energy, rhythm), calibrated against how they sound across the whole recording, with the meaning of the words (RoBERTa GoEmotions). A line is only tagged with an emotion when it clearly stands out; everything else counts as neutral.",
-  },
-  audio: {
-    from: "tone of voice",
-    sidebar: "voice (wav2vec2)",
-    note: "Emotions are detected from each speaker's voice (pitch, energy, rhythm), calibrated against how they sound across the whole recording. The words aren't considered because the text model only understands English, so treat single-line tags as indicative.",
-  },
-  text: {
-    from: "the words spoken",
-    sidebar: "text (RoBERTa)",
-    note: "Emotions are detected from the words spoken (RoBERTa GoEmotions model), not from the voice, so sarcasm or tone may be missed.",
-  },
-};

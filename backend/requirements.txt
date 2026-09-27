@@ -5,30 +5,20 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 
-# Speech-to-text (runs locally; model is downloaded on first use)
-faster-whisper==1.2.1
+# Audio decoding (bundles FFmpeg, so no system install is needed)
+av==18.1.0
+numpy
 
-# Text emotion model (RoBERTa GoEmotions, ONNX)
-onnxruntime==1.30.0
-
-# PDF reports; the last two lay out right-to-left scripts (Urdu, Arabic) correctly
+# PDF reports; the last two lay out right-to-left file names (Urdu, Arabic) correctly
 reportlab==4.4.4
 arabic-reshaper==3.0.0
 python-bidi==0.6.6
 
-# Speaker diarization (optional heavy dependencies). The app runs fine without
-# these installed -- it automatically falls back to synthetic mock diarization.
-# Install these (and set HUGGINGFACE_TOKEN in .env) to enable real diarization
-# with pyannote/speaker-diarization-3.1:
-# (CPU wheels: pip install --index-url https://download.pytorch.org/whl/cpu
-#  --extra-index-url https://pypi.org/simple <packages below>)
-# torch==2.5.1
-# torchaudio==2.5.1
-# pyannote.audio==3.3.2
-# huggingface_hub<1.0   # pyannote 3.3.x passes use_auth_token, removed in hub 1.0
-# matplotlib            # imported by pyannote.audio but not declared as a dependency
-#
-# Voice-based emotion detection (EMOTION_SOURCE=audio, the default) also needs torch
-# from above plus the following; without them emotions fall back to the text model:
-# transformers==4.57.6
-# tokenizers==0.22.2    # the version transformers 4.57 accepts; faster-whisper is fine with it
+# Speaker diarization (pyannote/speaker-diarization-3.1; needs HUGGINGFACE_TOKEN in .env).
+# Install torch from the CPU index first to avoid the multi-GB CUDA build:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchaudio==2.5.1
+torch==2.5.1
+torchaudio==2.5.1
+pyannote.audio==3.3.2
+huggingface_hub<1.0   # pyannote 3.3.x passes use_auth_token, removed in hub 1.0
+matplotlib            # imported by pyannote.audio but not declared as a dependency

@@ -61,7 +61,7 @@ export default function LatencySection({
     <div className="space-y-6">
       <SectionHeader
         icon={Timer}
-        eyebrow="Layer 02"
+        eyebrow="Layer 01"
         title="Response Latency"
         description="How long each speaker waits before replying: the silence between one person finishing and the other starting. Around 0.2–1s feels natural in conversation."
       />

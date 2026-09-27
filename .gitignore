@@ -24,7 +24,8 @@ node_modules/
 # Next.js dashboard
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
+frontend/.env*.local
+frontend/out/
 frontend/next-env.d.ts
 
 # Logs / build caches / stray test output

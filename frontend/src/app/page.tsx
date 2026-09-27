@@ -4,29 +4,24 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ChevronRight, FileDown, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LanguageNotice } from "@/components/LanguagePanel";
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
-import EmotionsSection from "@/components/sections/EmotionsSection";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
 import LatencySection from "@/components/sections/LatencySection";
 import Overview from "@/components/sections/Overview";
-import TranscriptSection from "@/components/sections/TranscriptSection";
 import Sidebar, { type View } from "@/components/Sidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import UploadCard from "@/components/UploadCard";
 import { analyzeRecording, downloadReportPdf } from "@/lib/api";
 import { buildSpeakerMeta } from "@/lib/format";
-import type { AnalysisReport, Transcript } from "@/lib/types";
+import type { AnalysisReport } from "@/lib/types";
 
 const VIEW_TITLES: Record<View, string> = {
   overview: "Overview",
-  transcript: "Speech-to-Text",
   latency: "Response Latency",
   interruptions: "Interruptions",
-  emotions: "Emotions",
 };
 
-function ProcessingCard({ stage }: { stage: Stage }) {
+function ProcessingCard() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
@@ -38,9 +33,7 @@ function ProcessingCard({ stage }: { stage: Stage }) {
       ))}
       <p className="col-span-full flex items-center gap-2 text-sm text-slate-500">
         <LoaderCircle className="h-4 w-4 animate-spin text-violet-500 dark:text-violet-400" />
-        {stage === "transcribing"
-          ? "Transcribing the recording… the first run also downloads the speech model."
-          : "Identifying speakers, measuring timing and reading emotions…"}
+        Identifying who spoke when, then measuring response latency and interruptions…
       </p>
     </div>
   );
@@ -52,11 +45,8 @@ export default function DashboardPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [failedAt, setFailedAt] = useState<number | null>(null);
-  const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Spoken language for the next analysis: null = let Whisper detect it.
-  const [language, setLanguage] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -90,7 +80,6 @@ export default function DashboardPage() {
     abortRef.current?.abort();
     setFile(null);
     setAudioUrl(null);
-    setTranscript(null);
     setReport(null);
     setError(null);
     setPdfError(null);
@@ -102,14 +91,13 @@ export default function DashboardPage() {
     updateStage("idle");
   }, []);
 
-  const handleFileSelected = useCallback(async (selected: File, lang: string | null) => {
+  const handleFileSelected = useCallback(async (selected: File) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setFile(selected);
     setAudioUrl(URL.createObjectURL(selected));
-    setTranscript(null);
     setReport(null);
     setError(null);
     setPdfError(null);
@@ -117,19 +105,15 @@ export default function DashboardPage() {
     setIsPlaying(false);
     setCurrentTime(0);
     setView("overview");
-    updateStage("transcribing");
+    updateStage("analyzing");
 
     let pipelineStarted = false;
     try {
       await analyzeRecording(
         selected,
-        lang,
         (event) => {
           pipelineStarted = true;
           switch (event.stage) {
-            case "transcript":
-              setTranscript(event.transcript);
-              break;
             case "analyzing":
               updateStage("analyzing");
               break;
@@ -148,21 +132,12 @@ export default function DashboardPage() {
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      // 0 = upload rejected/unreachable before the pipeline started, 1 = transcription, 2 = analysis.
-      setFailedAt(!pipelineStarted ? 0 : stageRef.current === "analyzing" ? 2 : 1);
+      // 0 = upload rejected/unreachable before the pipeline started, 1 = analysis.
+      setFailedAt(pipelineStarted ? 1 : 0);
       setError((err as Error).message);
       updateStage("error");
     }
   }, []);
-
-  const reanalyze = useCallback(
-    (code: string | null) => {
-      if (!file) return;
-      setLanguage(code);
-      handleFileSelected(file, code);
-    },
-    [file, handleFileSelected],
-  );
 
   const exportPdf = async () => {
     if (!report) return;
@@ -194,7 +169,7 @@ export default function DashboardPage() {
     else audio.pause();
   };
 
-  const busy = stage === "transcribing" || stage === "analyzing";
+  const busy = stage === "analyzing";
 
   const player = (
     <UploadCard
@@ -203,9 +178,7 @@ export default function DashboardPage() {
       isPlaying={isPlaying}
       currentTime={currentTime}
       duration={duration}
-      language={language}
-      onLanguageChange={setLanguage}
-      onFileSelected={(selected) => handleFileSelected(selected, language)}
+      onFileSelected={handleFileSelected}
       onReset={reset}
       onTogglePlay={togglePlay}
       onSeek={seek}
@@ -215,7 +188,7 @@ export default function DashboardPage() {
   return (
     <MotionConfig reducedMotion="user">
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <Sidebar view={view} onNavigate={navigate} report={report} transcript={transcript} busy={busy} />
+      <Sidebar view={view} onNavigate={navigate} report={report} busy={busy} />
 
       <main className="min-w-0 flex-1">
         <div className="sticky top-0 z-40 border-b border-slate-200/60 bg-page/70 backdrop-blur-xl">
@@ -262,7 +235,7 @@ export default function DashboardPage() {
                   />
                 )}
                 <span className={stage === "done" ? "hidden sm:inline" : undefined}>
-                  {{ idle: "Ready", transcribing: "Transcribing", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
+                  {{ idle: "Ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
                 </span>
                 {stage === "done" && report?.timings.total ? (
                   <span className="hidden font-mono opacity-70 sm:inline">· {report.timings.total.toFixed(0)}s</span>
@@ -319,57 +292,35 @@ export default function DashboardPage() {
                     <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
                       {report
                         ? "A summary of the whole recording. Click any card, or a layer in the sidebar, to open its detailed analysis."
-                        : "Upload a recording to get a speaker-attributed transcript, response latency, interruption patterns and each speaker's emotional tone."}
+                        : "Upload a recording to see who spoke when, how quickly each person responds, and who interrupts whom."}
                     </p>
                   </header>
 
                   {file && <PipelineSteps stage={stage} failedAt={failedAt} />}
                   {player}
-                  {(report?.transcript ?? transcript) && !busy && (
-                    <LanguageNotice
-                      key={`${file?.name}-${(report?.transcript ?? transcript)!.language}`}
-                      transcript={(report?.transcript ?? transcript)!}
-                      busy={busy}
-                      onReanalyze={reanalyze}
-                    />
-                  )}
 
                   {error && (
                     <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                       <div>
                         <p className="font-semibold">
-                          {failedAt === 0 ? "Upload failed" : failedAt === 2 ? "Analysis failed" : "Transcription failed"}
+                          {failedAt === 0 ? "Upload failed" : "Analysis failed"}
                         </p>
                         <p>{error}</p>
                       </div>
                     </div>
                   )}
 
-                  {busy && <ProcessingCard stage={stage} />}
+                  {busy && <ProcessingCard />}
                   {report && (
                     <Overview report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} onNavigate={navigate} />
                   )}
                 </>
               )}
 
-              {view === "transcript" && (
-                <TranscriptSection
-                  stage={stage}
-                  transcript={transcript}
-                  report={report}
-                  speakers={speakers}
-                  currentTime={currentTime}
-                  isPlaying={isPlaying}
-                  onSeek={seek}
-                />
-              )}
               {view === "latency" && report && <LatencySection report={report} speakers={speakers} onSeek={seek} />}
               {view === "interruptions" && report && (
                 <InterruptionsSection report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} />
-              )}
-              {view === "emotions" && report && (
-                <EmotionsSection report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} />
               )}
             </motion.div>
           </AnimatePresence>

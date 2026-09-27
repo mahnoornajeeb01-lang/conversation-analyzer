@@ -52,7 +52,7 @@ export default function InterruptionsSection({
     <div className="space-y-6">
       <SectionHeader
         icon={Zap}
-        eyebrow="Layer 03"
+        eyebrow="Layer 02"
         title="Interruptions"
         description="Moments when both people spoke at once, classified by what happened next: did the interrupter take over, did both keep talking, or was it just a brief overlap?"
       />

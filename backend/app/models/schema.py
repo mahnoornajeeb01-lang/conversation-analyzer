@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -33,35 +33,6 @@ class SpeakerSegment(BaseModel):
     @property
     def duration(self) -> float:
         return round(self.end - self.start, 6)
-
-
-class TranscriptSegment(BaseModel):
-    """A span of transcribed speech, optionally attributed to a diarized speaker."""
-
-    speaker: Optional[str] = Field(None, description="Speaker label once diarization has been matched")
-    start: float = Field(..., ge=0)
-    end: float = Field(..., ge=0)
-    text: str
-    emotion: Optional[str] = Field(None, description="Dominant emotion family for this line, if analysed")
-    emotion_confidence: Optional[float] = None
-    emotion_scores: Optional[Dict[str, float]] = Field(None, description="Probability per emotion family")
-
-
-class LanguageGuess(BaseModel):
-    code: str
-    probability: float
-
-
-class Transcript(BaseModel):
-    """Result of the speech-to-text stage."""
-
-    segments: List[TranscriptSegment]
-    language: Optional[str] = None
-    language_probability: Optional[float] = Field(None, description="Whisper's confidence; None when the user chose the language")
-    language_source: Literal["detected", "selected"] = "detected"
-    language_alternatives: List[LanguageGuess] = []
-    model: str
-    word_count: int = 0
 
 
 class LatencyEvent(BaseModel):
@@ -117,29 +88,12 @@ class InterruptionEvent(BaseModel):
 
 
 class SpeakerProfile(BaseModel):
-    """Per-speaker overview, including a name detected from the conversation if any."""
+    """Per-speaker share of the conversation."""
 
     speaker: str = Field(..., description="Diarization label, e.g. 'Speaker 1'")
-    display_name: str = Field(..., description="Detected name, or the diarization label")
-    detected_name: Optional[str] = None
-    name_evidence: Optional[str] = Field(None, description="Transcript line the name came from")
     talk_time: float
     talk_share: float
     turns: int
-    words: int
-    words_per_minute: float
-
-
-class EmotionScore(BaseModel):
-    emotion: str
-    score: float
-
-
-class SpeakerEmotionSummary(BaseModel):
-    speaker: str
-    dominant: str
-    distribution: List[EmotionScore]
-    line_counts: Dict[str, int]
 
 
 class AnalysisReport(BaseModel):
@@ -164,12 +118,6 @@ class AnalysisReport(BaseModel):
 
     diarization_source: Literal["pyannote", "mock"] = "mock"
 
-    transcript: Optional[Transcript] = None
-
     speaker_profiles: List[SpeakerProfile] = []
-    emotions: Optional[List[SpeakerEmotionSummary]] = None
-    emotion_source: Optional[Literal["combined", "audio", "text"]] = Field(
-        None, description="Voice and words combined, voice-tone model only, or words model only"
-    )
 
     timings: Dict[str, float] = Field(default_factory=dict, description="Seconds spent per pipeline stage")

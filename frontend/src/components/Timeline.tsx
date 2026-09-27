@@ -3,7 +3,7 @@
 import { Flame, MessagesSquare, MinusCircle, type LucideIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
-import { EMOTION_META, formatClock, type SpeakerMeta } from "@/lib/format";
+import { formatClock, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Classification } from "@/lib/types";
 
 export const CLASSIFICATION_META: Record<
@@ -56,14 +56,12 @@ export default function Timeline({
   speakers,
   currentTime,
   onSeek,
-  mode = "speaker",
   showInterruptions = true,
 }: {
   report: AnalysisReport;
   speakers: Record<string, SpeakerMeta>;
   currentTime: number;
   onSeek: (seconds: number) => void;
-  mode?: "speaker" | "emotion";
   showInterruptions?: boolean;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -74,32 +72,17 @@ export default function Timeline({
   const lanes = useMemo(() => {
     return report.speakers.map((label) => {
       const meta = speakers[label];
-      let blocks: Block[];
-      if (mode === "emotion") {
-        blocks = (report.transcript?.segments ?? [])
-          .filter((s) => s.speaker === label)
-          .map((s) => {
-            const emo = EMOTION_META[s.emotion ?? "neutral"];
-            return {
-              start: s.start,
-              end: Math.min(s.end, total),
-              color: emo.color,
-              tip: `${meta?.name ?? label} · ${emo.label} · ${formatClock(s.start)}\n“${s.text}”`,
-            };
-          });
-      } else {
-        blocks = report.segments
-          .filter((s) => s.speaker === label)
-          .map((s) => ({
-            start: s.start,
-            end: s.end,
-            color: meta?.color ?? "#64748b",
-            tip: `${meta?.name ?? label} · ${formatClock(s.start)} – ${formatClock(s.end)} (${(s.end - s.start).toFixed(1)}s)`,
-          }));
-      }
+      const blocks: Block[] = report.segments
+        .filter((s) => s.speaker === label)
+        .map((s) => ({
+          start: s.start,
+          end: s.end,
+          color: meta?.color ?? "#64748b",
+          tip: `${meta?.name ?? label} · ${formatClock(s.start)} – ${formatClock(s.end)} (${(s.end - s.start).toFixed(1)}s)`,
+        }));
       return { label, meta, blocks };
     });
-  }, [report, speakers, mode, total]);
+  }, [report, speakers]);
 
   if (total <= 0) return null;
   const playheadPct = Math.min((currentTime / total) * 100, 100);

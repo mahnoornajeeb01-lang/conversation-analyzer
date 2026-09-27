@@ -1,22 +1,20 @@
 import type { AnalysisReport, StreamEvent } from "./types";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+/** Empty = same origin: the production build is served by the backend itself.
+ *  `next dev` sets it to http://localhost:8000 via .env.development.local. */
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 /**
  * Upload a recording and stream pipeline events back as they happen:
- * transcribing -> transcript -> analyzing -> report (or error).
+ * analyzing -> report (or error).
  */
 export async function analyzeRecording(
   file: File,
-  /** Whisper language code, or null to auto-detect. */
-  language: string | null,
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   const body = new FormData();
   body.append("file", file);
-  if (language) body.append("language", language);
 
   let response: Response;
   try {
@@ -28,7 +26,7 @@ export async function analyzeRecording(
   } catch (err) {
     if ((err as Error).name === "AbortError") throw err;
     throw new Error(
-      `Could not reach the analysis server at ${API_BASE_URL}. Is the backend running?`,
+      `Could not reach the analysis server${API_BASE_URL ? ` at ${API_BASE_URL}` : ""}. Is the backend running?`,
     );
   }
 
@@ -75,7 +73,7 @@ export async function downloadReportPdf(report: AnalysisReport): Promise<void> {
       body: JSON.stringify(report),
     });
   } catch {
-    throw new Error(`Could not reach the analysis server at ${API_BASE_URL}.`);
+    throw new Error(`Could not reach the analysis server${API_BASE_URL ? ` at ${API_BASE_URL}` : ""}.`);
   }
   if (!response.ok) {
     let detail = `PDF export failed (${response.status}).`;

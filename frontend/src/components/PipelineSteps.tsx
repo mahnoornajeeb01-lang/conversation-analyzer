@@ -1,14 +1,13 @@
 import { Check, LoaderCircle, TriangleAlert, type LucideIcon } from "lucide-react";
-import { AudioLines, FileText, Upload } from "lucide-react";
+import { AudioLines, Upload } from "lucide-react";
 
-export type Stage = "idle" | "transcribing" | "analyzing" | "done" | "error";
+export type Stage = "idle" | "analyzing" | "done" | "error";
 
 type StepState = "pending" | "active" | "done" | "error";
 
 const STEPS: { key: string; label: string; hint: string; icon: LucideIcon }[] = [
   { key: "upload", label: "Upload", hint: "Add a recording", icon: Upload },
-  { key: "transcribe", label: "Speech to text", hint: "Whisper transcription", icon: FileText },
-  { key: "analyze", label: "Conversation analysis", hint: "Speakers, timing & emotions", icon: AudioLines },
+  { key: "analyze", label: "Conversation analysis", hint: "Speakers, response latency & interruptions", icon: AudioLines },
 ];
 
 function stateFor(index: number, stage: Stage, failedAt: number | null): StepState {
@@ -16,7 +15,7 @@ function stateFor(index: number, stage: Stage, failedAt: number | null): StepSta
     if (failedAt === index) return "error";
     return failedAt !== null && index < failedAt ? "done" : "pending";
   }
-  const current = { idle: 0, transcribing: 1, analyzing: 2, done: 3, error: 0 }[stage];
+  const current = { idle: 0, analyzing: 1, done: 2, error: 0 }[stage];
   if (stage === "idle") return index === 0 ? "active" : "pending";
   if (index < current) return "done";
   if (index === current) return "active";
@@ -32,7 +31,7 @@ export default function PipelineSteps({
   failedAt: number | null;
 }) {
   return (
-    <ol className="grid gap-3 sm:grid-cols-3">
+    <ol className="grid gap-3 sm:grid-cols-2">
       {STEPS.map((step, i) => {
         const state = stateFor(i, stage, failedAt);
         const Icon = step.icon;

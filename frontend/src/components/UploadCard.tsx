@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FileAudio, Pause, Play, RotateCcw, Sparkles, UploadCloud } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { LanguageSelect } from "@/components/LanguagePanel";
 import { formatBytes, formatClock } from "@/lib/format";
 
 const ACCEPTED = ".wav,.mp3,.m4a,.flac,.ogg,.mpeg,.mpg,.mpga,.mp2";
@@ -16,8 +15,6 @@ interface UploadCardProps {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
-  language: string | null;
-  onLanguageChange: (code: string | null) => void;
   onFileSelected: (file: File) => void;
   onReset: () => void;
   onTogglePlay: () => void;
@@ -30,8 +27,6 @@ export default function UploadCard({
   isPlaying,
   currentTime,
   duration,
-  language,
-  onLanguageChange,
   onFileSelected,
   onReset,
   onTogglePlay,
@@ -197,13 +192,6 @@ export default function UploadCard({
           <span className="text-[11px] text-slate-500">up to 200 MB</span>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-slate-600">
-          <label htmlFor="upload-language">Spoken language</label>
-          <LanguageSelect id="upload-language" value={language} onChange={onLanguageChange} disabled={disabled} />
-        </div>
-        <p className="mt-1.5 text-[11px] text-slate-400">
-          Leave on auto-detect, or choose it if you know it. That&apos;s the most reliable option for mixed or accented speech.
-        </p>
 
         <input
           ref={inputRef}

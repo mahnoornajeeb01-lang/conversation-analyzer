@@ -11,7 +11,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" }
 export const metadata: Metadata = {
   title: "Conversation Analyzer",
   description:
-    "Upload a recording to transcribe it and analyze speakers, response latency, interruptions and emotions.",
+    "Upload a recording to analyze who spoke when, response latency and interruptions.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

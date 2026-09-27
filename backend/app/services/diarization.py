@@ -110,7 +110,7 @@ def _normalize_speaker_labels(raw_segments: List[Tuple[str, float, float]]) -> L
 
 def run_pyannote_diarization(audio: np.ndarray) -> Optional[List[SpeakerSegment]]:
     """Run pyannote.audio on 16 kHz mono audio (decoded once by the caller with
-    faster-whisper, since torchaudio can't read mp3/m4a on Windows without FFmpeg).
+    PyAV, since torchaudio can't read mp3/m4a on Windows without FFmpeg).
     Returns None if the pipeline is unavailable or fails, so callers can fall back to mock."""
     pipeline = _get_pipeline()
     if pipeline is None:

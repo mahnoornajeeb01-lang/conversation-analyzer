@@ -1,9 +1,8 @@
-"""Render an AnalysisReport as a multi-page PDF (reportlab): summary, speakers, timeline,
-latency, interruptions, emotions and the full transcript.
+"""Render an AnalysisReport as a PDF (reportlab): summary, speakers, timeline,
+response latency and interruptions.
 
-Text uses a system TrueType font when one is available (Arial/DejaVu cover Latin,
-Greek, Cyrillic, Arabic and Hebrew; Helvetica would turn those into boxes), and
-right-to-left lines are reshaped/reordered so Urdu and Arabic read correctly.
+Text uses a system TrueType font when one is available, and right-to-left file names
+are reshaped/reordered so Urdu and Arabic read correctly.
 """
 
 from __future__ import annotations
@@ -47,27 +46,11 @@ ACCENT = colors.HexColor("#4f46e5")
 
 # Same validated categorical palette as the dashboard (light mode).
 SPEAKER_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
-EMOTION_ORDER = ["surprise", "joy", "fear", "sadness", "anger", "neutral"]
-EMOTION_COLORS = {
-    "surprise": "#1baf7a",
-    "joy": "#eda100",
-    "fear": "#e87ba4",
-    "sadness": "#4a3aa7",
-    "anger": "#e34948",
-    "neutral": "#8f8d86",
-}
 CLASS_SHORT = {
     "Successful Interruption (Floor Transfer)": "Floor transfer",
     "Competitive Overlap / Backchannel": "Backchannel",
     "Brief Overlap": "Brief overlap",
 }
-LANGUAGE_NAMES = {
-    "en": "English", "ur": "Urdu", "hi": "Hindi", "ar": "Arabic", "pa": "Punjabi", "bn": "Bengali",
-    "fa": "Persian", "ps": "Pashto", "sd": "Sindhi", "tr": "Turkish", "fr": "French", "de": "German",
-    "es": "Spanish", "it": "Italian", "pt": "Portuguese", "ru": "Russian", "zh": "Chinese",
-    "ja": "Japanese", "ko": "Korean", "nl": "Dutch", "id": "Indonesian", "ms": "Malay",
-}
-
 _FONT_CANDIDATES: List[Tuple[str, Optional[str]]] = [
     (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
     ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
@@ -129,7 +112,6 @@ class _Builder:
     def __init__(self, report: AnalysisReport) -> None:
         self.r = report
         self.font, self.bold = _register_fonts()
-        self.names: Dict[str, str] = {p.speaker: p.display_name for p in report.speaker_profiles}
         self.colors: Dict[str, colors.Color] = {
             s: colors.HexColor(SPEAKER_COLORS[i % len(SPEAKER_COLORS)]) for i, s in enumerate(report.speakers)
         }
@@ -146,7 +128,7 @@ class _Builder:
         self.s_kpi_l = ParagraphStyle("kpil", fontName=self.font, fontSize=7, leading=9, textColor=SECONDARY)
 
     def name(self, label: Optional[str]) -> str:
-        return self.names.get(label or "", label or "Unknown")
+        return label or "Unknown"
 
     def p(self, text: str, style: ParagraphStyle) -> Paragraph:
         return Paragraph(escape(_shape(text)), style)
@@ -253,18 +235,6 @@ class _Builder:
         d.add(String(pad_l + 3, y + 2.5, f"average {avg:.2f}s", fontName=self.bold, fontSize=6.5, fillColor=INK))
         return d
 
-    def stacked_bar(self, parts: List[Tuple[float, str]], width: float, height: float = 9) -> Drawing:
-        d = Drawing(width, height)
-        total = sum(v for v, _ in parts) or 1
-        x = 0.0
-        for v, c in parts:
-            w = v / total * width
-            if w <= 0.3:
-                continue
-            d.add(Rect(x, 0, max(w - 1, 0.3), height, fillColor=colors.HexColor(c), strokeColor=None))
-            x += w
-        return d
-
     # ------------------------------------------------------------------ sections
 
     def build(self) -> bytes:
@@ -278,16 +248,6 @@ class _Builder:
             title=f"Conversation analysis – {r.filename}", author="Conversation Analyzer",
         )
         story: List = []
-        t = r.transcript
-
-        # Cover / header
-        lang = "—"
-        if t and t.language:
-            lang = LANGUAGE_NAMES.get(t.language, t.language.upper())
-            if t.language_probability is not None:
-                lang += f" ({round(t.language_probability * 100)}% confidence)"
-            elif t.language_source == "selected":
-                lang += " (selected)"
         story += [
             self.p("CONVERSATION ANALYSIS REPORT", self.s_eyebrow),
             Spacer(1, 1.5 * mm),
@@ -295,39 +255,23 @@ class _Builder:
             Spacer(1, 1.5 * mm),
             self.p(
                 f"Generated {datetime.now():%d %B %Y, %H:%M} · Duration {_duration(r.total_duration)} · "
-                f"{r.speaker_count} speakers · Language: {lang}",
+                f"{r.speaker_count} speakers",
                 self.s_lead,
             ),
             Spacer(1, 5 * mm),
         ]
 
         # KPI grid
-        mood = "—"
-        if r.emotions:
-            share = {p.speaker: p.talk_share for p in r.speaker_profiles}
-            totals: Dict[str, float] = {}
-            for e in r.emotions:
-                for d in e.distribution:
-                    totals[d.emotion] = totals.get(d.emotion, 0) + d.score * share.get(e.speaker, 1)
-            ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
-            s = sum(totals.values()) or 1
-            top = ranked[0][0]
-            nn = next((k for k, v in ranked if k != "neutral"), None)
-            if top == "neutral" and nn and totals[nn] / s >= 0.2:
-                top = nn
-            mood = top.capitalize()
         kpis = [
             ("Duration", _duration(r.total_duration)),
-            ("Words spoken", f"{t.word_count:,}" if t else "—"),
+            ("Speakers", str(r.speaker_count)),
             ("Avg. response", f"{r.latency_stats.average:.2f}s"),
-            ("Turn changes", str(r.latency_stats.total_turns_analyzed)),
+            ("Hand-offs", str(r.latency_stats.total_turns_analyzed)),
             ("Interruptions", str(r.interruption_count)),
             ("Overlaps", str(r.overlap_count)),
-            ("Overall mood", mood),
-            ("Speakers", str(r.speaker_count)),
         ]
-        cells = [[[self.p(v, self.s_kpi_v), self.p(l.upper(), self.s_kpi_l)] for l, v in kpis[i:i + 4]] for i in (0, 4)]
-        kpi = Table(cells, colWidths=[content_w / 4] * 4, rowHeights=[16 * mm] * 2)
+        cells = [[[self.p(v, self.s_kpi_v), self.p(l.upper(), self.s_kpi_l)] for l, v in kpis[i:i + 3]] for i in (0, 3)]
+        kpi = Table(cells, colWidths=[content_w / 3] * 3, rowHeights=[16 * mm] * 2)
         kpi.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.5, HAIRLINE),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, HAIRLINE),
@@ -338,16 +282,12 @@ class _Builder:
         story.append(kpi)
 
         # Speakers
-        story += self.section("Speakers", "Who took part",
-                              "Names are picked up when they are said in the conversation; otherwise speakers are numbered by order of appearance.")
-        emo_by = {e.speaker: e for e in (r.emotions or [])}
-        rows = [["", "Speaker", "Talk share", "Talk time", "Turns", "Words", "Words/min", "Overall tone"]]
+        story += self.section("Speakers", "Who took part", "Speakers are numbered by order of appearance.")
+        rows = [["", "Speaker", "Talk share", "Talk time", "Turns"]]
         for p in r.speaker_profiles:
-            tone = emo_by[p.speaker].dominant.capitalize() if p.speaker in emo_by else "—"
-            name = p.display_name + ("" if not p.detected_name else f"  ({p.speaker})")
-            rows.append([self.dot(self.colors[p.speaker]), self.p(name, self.s_cell_b), f"{round(p.talk_share * 100)}%",
-                         _duration(p.talk_time), p.turns, p.words, round(p.words_per_minute), tone])
-        story.append(self.table(rows, [8 * mm, 46 * mm, 20 * mm, 20 * mm, 14 * mm, 16 * mm, 18 * mm, None]))
+            rows.append([self.dot(self.colors[p.speaker]), self.p(p.speaker, self.s_cell_b),
+                         f"{round(p.talk_share * 100)}%", _duration(p.talk_time), p.turns])
+        story.append(self.table(rows, [8 * mm, 60 * mm, 30 * mm, 30 * mm, None]))
 
         story += self.section("Timeline", "Conversation timeline",
                               "Who spoke when. Shaded bands mark moments where both people spoke at once.")
@@ -355,7 +295,7 @@ class _Builder:
 
         # Latency
         s = r.latency_stats
-        story += self.section("Layer 02", "Response latency",
+        story += self.section("Layer 01", "Response latency",
                               "The silence between one person finishing and the other starting. Around 0.2–1 s feels natural.")
         story.append(self.table([["Average", "Median", "Fastest", "Slowest", "Hand-offs"],
                                  [f"{s.average:.2f}s", f"{s.median:.2f}s", f"{s.minimum:.2f}s", f"{s.maximum:.2f}s", s.total_turns_analyzed]],
@@ -372,7 +312,7 @@ class _Builder:
                       KeepTogether(self.table([["", "Speaker", "Replies", "Average reply time"]] + per, [8 * mm, 60 * mm, 25 * mm, None]))]
 
         # Interruptions
-        story += self.section("Layer 03", "Interruptions",
+        story += self.section("Layer 02", "Interruptions",
                               "Moments of overlapping speech, classified by what happened next.")
         counts = {k: 0 for k in CLASS_SHORT}
         for e in r.interruptions:
@@ -392,47 +332,10 @@ class _Builder:
         else:
             story.append(self.p("No overlapping speech was detected.", self.s_small))
 
-        # Emotions
-        source = {"combined": "the tone of each speaker's voice combined with the words spoken",
-                  "audio": "the tone of each speaker's voice (wav2vec2 speech-emotion model)",
-                  "text": "the words spoken (RoBERTa GoEmotions text model)"}.get(r.emotion_source or "", "")
-        story += self.section("Layer 04", "Emotions",
-                              f"Detected line by line from {source}, weighted by how long each line lasts." if source
-                              else "Emotion analysis was unavailable for this recording.")
-        if r.emotions:
-            bar_w = content_w - 58 * mm
-            rows = [["Speaker", "Emotion mix", "Overall"]]
-            for e in r.emotions:
-                dist = {d.emotion: d.score for d in e.distribution}
-                rows.append([self.p(self.name(e.speaker), self.s_cell_b),
-                             self.stacked_bar([(dist.get(k, 0), EMOTION_COLORS[k]) for k in EMOTION_ORDER], bar_w),
-                             e.dominant.capitalize()])
-            story.append(self.table(rows, [34 * mm, bar_w + 4 * mm, None], zebra=False))
-            legend = "   ".join(f'<font color="{EMOTION_COLORS[k]}">■</font> {k.capitalize()}' for k in EMOTION_ORDER)
-            story += [Spacer(1, 1.5 * mm), Paragraph(legend, self.s_small), Spacer(1, 3 * mm)]
-            header = ["Emotion"] + [self.name(e.speaker) for e in r.emotions]
-            rows = [header]
-            for k in EMOTION_ORDER:
-                rows.append([k.capitalize()] + [f"{round(next((d.score for d in e.distribution if d.emotion == k), 0) * 100)}%" for e in r.emotions])
-            story.append(self.table(rows, [34 * mm] + [(content_w - 34 * mm) / len(r.emotions)] * len(r.emotions)))
-
-        # Transcript
-        if t and t.segments:
-            story += self.section("Layer 01", "Transcript",
-                                  f"Speech-to-text by Whisper ({t.model}), attributed to each speaker. {t.word_count:,} words.")
-            rows = [["Time", "Speaker", "Tone", "Text"]]
-            for seg in t.segments:
-                rows.append([_clock(seg.start), self.p(self.name(seg.speaker), self.s_cell_b),
-                             (seg.emotion or "").capitalize(), self.p(seg.text, self.s_cell)])
-            tbl = self.table(rows, [14 * mm, 30 * mm, 18 * mm, None])
-            tbl.setStyle(TableStyle([("VALIGN", (0, 1), (-1, -1), "TOP")]))
-            story.append(tbl)
-
         # Method notes
         notes = [
             f"Speaker diarization: {'pyannote/speaker-diarization-3.1' if r.diarization_source == 'pyannote' else 'simulated (illustrative only)'}.",
             "Latency is measured only for clean hand-offs between different speakers; overlapping turns are counted as interruptions instead.",
-            "Emotion labels are model estimates, not ground truth; voice-based emotion can be affected by recording quality and speaking style.",
         ]
         if r.timings.get("total"):
             notes.append(f"Processed in {r.timings['total']:.1f}s.")
