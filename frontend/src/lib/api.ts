@@ -30,8 +30,8 @@ function isAllowedServer(url: string): boolean {
 function unreachable(base: string): Error {
   return new Error(
     base
-      ? `Could not reach the analysis server at ${base}. The link may have expired; ask for a new one.`
-      : "This page isn't connected to an analysis server. Open it with the full share link (it ends in ?server=…).",
+      ? "The analysis server is offline right now (the computer running it is off or was restarted). Please try again later."
+      : "This page isn't connected to an analysis server yet. Please try again later.",
   );
 }
 

@@ -1,5 +1,5 @@
-# Starts the analysis server on this PC and a free Cloudflare tunnel to it, then prints
-# the link to the Vercel site wired to this PC. Run it through share.bat.
+# Starts the analysis server on this PC and a free Cloudflare tunnel to it, points the
+# Vercel site at it, then prints the link to share. Run it through share.bat.
 
 $root = $PSScriptRoot
 $site = "https://conversation-analyzer-iota-umber.vercel.app"
@@ -40,7 +40,21 @@ for ($i = 0; $i -lt 45 -and -not $ready; $i++) {
     try { $ready = (Invoke-RestMethod "$tunnel/api/health" -TimeoutSec 10).status -eq "ok" } catch { Start-Sleep -Seconds 4 }
 }
 
-$link = "$site/?server=$tunnel"
+# Redeploy the Vercel site with this address built in, so the plain site address works
+# without ?server=... (uses this PC's Vercel CLI login; about a minute).
+Write-Host "Updating the Vercel site to use this PC, about a minute..."
+Push-Location (Join-Path $root "frontend")
+$deploy = & npx.cmd --yes vercel deploy --prod --yes --build-env "NEXT_PUBLIC_API_BASE_URL=$tunnel" 2>&1
+$deployed = $LASTEXITCODE -eq 0
+Pop-Location
+
+if ($deployed) {
+    $link = $site
+} else {
+    Write-Host ($deploy | Select-Object -Last 5 | Out-String) -ForegroundColor DarkGray
+    Write-Host "Vercel update failed; the link below still works because it carries the address." -ForegroundColor Yellow
+    $link = "$site/?server=$tunnel"
+}
 Set-Content -Path (Join-Path $root "share-link.txt") -Value $link
 Set-Clipboard -Value $link
 Write-Host ""
