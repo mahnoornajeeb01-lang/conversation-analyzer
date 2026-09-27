@@ -46,6 +46,8 @@ _NOT_NAMES = {
     "January", "February", "March", "April", "May", "June", "July", "August", "September",
     "October", "November", "December", "English", "God", "Bye", "Goodbye", "Welcome", "Dear",
     "Absolutely", "Definitely", "Exactly", "Perfect", "Cool", "Nice", "Alright", "Anyway",
+    "Honestly", "Seriously", "Basically", "Obviously", "Frankly", "Personally", "Luckily",
+    "Unfortunately", "Anyways", "Wow", "Look", "Listen", "Now", "Then", "Also", "Plus",
 }
 
 _NAME = r"([A-Z][a-z]{1,20}(?:\s[A-Z][a-z]{1,20})?)"
@@ -244,12 +246,42 @@ def _get_emotion_model() -> Optional[_EmotionModel]:
 
 
 def warm_up_emotions() -> None:
-    """Load whichever emotion model will be used, ahead of the first request."""
+    """Load the emotion models ahead of the first request (the text model is always
+    needed: it is fused with the voice model for English and is the voice fallback)."""
     if not settings.enable_emotions:
         return
-    if settings.emotion_source == "audio" and voice_emotion.available():
-        return
+    if settings.emotion_source == "audio":
+        voice_emotion.available()
     _get_emotion_model()
+
+
+# The text model understands English only; for English lines the words weigh more than
+# the voice model, which is far less reliable on real (non-acted) recordings.
+TEXT_LANGUAGES = {"en"}
+TEXT_WEIGHT = 0.6
+# A line is only labelled with an emotion when it clearly stands out; weak or split
+# evidence stays "neutral", which is what most conversational speech is.
+MIN_EMOTION_SCORE = 0.40
+MIN_EMOTION_MARGIN = 0.10
+
+
+def _label(dist: Dict[str, float]) -> str:
+    ranked = sorted(dist, key=dist.get, reverse=True)  # type: ignore[arg-type]
+    top = ranked[0]
+    if top == "neutral":
+        return top
+    runner_up = dist[ranked[1]] if len(ranked) > 1 else 0.0
+    if dist[top] < MIN_EMOTION_SCORE or dist[top] - runner_up < MIN_EMOTION_MARGIN:
+        return "neutral"
+    return top
+
+
+def _fuse(
+    voice: Optional[Dict[str, float]], text: Optional[Dict[str, float]]
+) -> Optional[Dict[str, float]]:
+    if voice is None or text is None:
+        return voice or text
+    return {f: TEXT_WEIGHT * text.get(f, 0.0) + (1 - TEXT_WEIGHT) * voice.get(f, 0.0) for f in EMOTION_FAMILIES}
 
 
 def _apply_scores(
@@ -260,12 +292,15 @@ def _apply_scores(
         if not dist:
             tagged.append(seg)
             continue
-        top = max(dist, key=dist.get)  # type: ignore[arg-type]
+        top = _label(dist)
+        confidence = dist[top]
+        if top == "neutral":  # also covers lines where no emotion stood out clearly
+            confidence = max(confidence, 1 - max(v for f, v in dist.items() if f != "neutral"))
         tagged.append(
             seg.model_copy(
                 update={
                     "emotion": top,
-                    "emotion_confidence": round(dist[top], 3),
+                    "emotion_confidence": round(confidence, 3),
                     "emotion_scores": {f: round(dist.get(f, 0.0), 4) for f in EMOTION_FAMILIES},
                 }
             )
@@ -273,56 +308,68 @@ def _apply_scores(
     return tagged
 
 
-def _text_emotions(transcript: List[TranscriptSegment]) -> Tuple[List[TranscriptSegment], Optional[str]]:
+def _text_scores(transcript: List[TranscriptSegment]) -> Optional[List[Dict[str, float]]]:
     model = _get_emotion_model()
     if model is None:
-        return transcript, None
+        return None
     try:
-        return _apply_scores(transcript, model.family_scores([s.text for s in transcript])), "text"
+        return model.family_scores([s.text for s in transcript])
     except Exception:
-        logger.exception("Text emotion scoring failed; emotions will be omitted.")
-        return transcript, None
+        logger.exception("Text emotion scoring failed.")
+        return None
 
 
 def tag_emotions(
-    audio: np.ndarray, transcript: List[TranscriptSegment]
+    audio: np.ndarray, transcript: List[TranscriptSegment], language: Optional[str] = None
 ) -> Tuple[List[TranscriptSegment], Optional[str]]:
     """Attach an emotion distribution to every transcript line (no speakers needed).
 
-    Uses the voice model (tone of voice) when `emotion_source == "audio"`, falling back
-    to the text model (the words) if it is unavailable. Returns (lines, source) where
-    source is "audio", "text", or None if neither model could run.
+    With `emotion_source == "audio"` the (calibrated) voice model scores how each line
+    sounded; for English it is combined with the text model's reading of the words.
+    Falls back to whichever model is available. Returns (lines, source) where source is
+    "combined", "audio", "text", or None if nothing could run.
     """
     if not settings.enable_emotions or not transcript:
         return transcript, None
+
+    voice: Optional[List[Optional[Dict[str, float]]]] = None
     if settings.emotion_source == "audio":
         try:
-            scores = voice_emotion.score_lines(audio, [(s.start, s.end) for s in transcript])
-            if scores is not None:
-                return _apply_scores(transcript, scores), "audio"
+            voice = voice_emotion.score_lines(audio, [(s.start, s.end) for s in transcript])
         except Exception:
             logger.exception("Voice emotion scoring failed; falling back to the text model.")
-    return _text_emotions(transcript)
+
+    # Words are only trusted in a language the text model understands, unless there is
+    # nothing else to go on.
+    text: Optional[List[Dict[str, float]]] = None
+    if (language or "en") in TEXT_LANGUAGES or voice is None:
+        text = _text_scores(transcript)
+
+    if voice is not None and text is not None:
+        return _apply_scores(transcript, [_fuse(v, t) for v, t in zip(voice, text)]), "combined"
+    if voice is not None:
+        return _apply_scores(transcript, voice), "audio"
+    if text is not None:
+        return _apply_scores(transcript, text), "text"
+    return transcript, None
 
 
 def summarize_emotions(
     transcript: List[TranscriptSegment], speakers: List[str]
 ) -> Optional[List[SpeakerEmotionSummary]]:
-    """Per-speaker emotion mix, weighted by how long each line lasts."""
+    """Per-speaker emotion mix: the share of each speaker's talk time whose line was
+    labelled with each emotion. Uses the per-line labels (not the raw scores) so lines
+    where no emotion clearly stood out count as neutral here too."""
     weighted: Dict[str, Dict[str, float]] = {sp: {f: 0.0 for f in EMOTION_FAMILIES} for sp in speakers}
     line_counts: Dict[str, Counter] = {sp: Counter() for sp in speakers}
     any_scored = False
 
     for seg in transcript:
-        if not seg.emotion_scores or seg.speaker not in weighted:
+        if not seg.emotion or seg.speaker not in weighted:
             continue
         any_scored = True
-        weight = max(seg.end - seg.start, 0.1)
-        for fam, value in seg.emotion_scores.items():
-            if fam in weighted[seg.speaker]:
-                weighted[seg.speaker][fam] += value * weight
-        if seg.emotion:
-            line_counts[seg.speaker][seg.emotion] += 1
+        weighted[seg.speaker][seg.emotion] += max(seg.end - seg.start, 0.1)
+        line_counts[seg.speaker][seg.emotion] += 1
 
     if not any_scored:
         return None
@@ -340,7 +387,7 @@ def summarize_emotions(
         # A speaker is only "neutral" overall if nothing else stands out.
         non_neutral = [e for e in distribution if e.emotion != "neutral"]
         strongest = max(non_neutral, key=lambda e: e.score)
-        if dominant == "neutral" and strongest.score >= 0.20:
+        if dominant == "neutral" and strongest.score >= 0.30:
             dominant = strongest.emotion
         summaries.append(
             SpeakerEmotionSummary(

@@ -31,12 +31,13 @@ class Settings(BaseSettings):
     whisper_device: str = "auto"
     whisper_compute_type: str = "int8"
     whisper_beam_size: int = 1
-    # Number of 30 s windows Whisper samples to decide the language (1 = first 30 s only).
-    language_detection_segments: int = 4
+    # Number of 30 s speech windows, spread across the recording, averaged to decide the language.
+    language_detection_segments: int = 6
 
     # Emotion detection. "audio" classifies each line's voice with a wav2vec2 speech-emotion
-    # model (~1.3 GB download on first use); "text" uses a RoBERTa GoEmotions model on the
-    # words. If the audio model can't load, the text model is used as a fallback.
+    # model (~1.3 GB download on first use), calibrated per recording and, for English,
+    # combined with a RoBERTa GoEmotions model on the words; "text" uses only the words.
+    # If the audio model can't load, the text model is used as a fallback.
     enable_emotions: bool = True
     emotion_source: str = "audio"
     audio_emotion_model: str = "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"

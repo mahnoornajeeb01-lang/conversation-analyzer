@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { EMOTION_SOURCE } from "@/lib/format";
 import { languageName } from "@/lib/languages";
 import type { AnalysisReport, Transcript } from "@/lib/types";
 
@@ -208,7 +209,7 @@ export default function Sidebar({
             </div>
           )}
           {report.emotion_source && (
-            <div className="mt-1 pl-3.5">Emotions: {report.emotion_source === "audio" ? "voice (wav2vec2)" : "text (RoBERTa)"}</div>
+            <div className="mt-1 pl-3.5">Emotions: {EMOTION_SOURCE[report.emotion_source].sidebar}</div>
           )}
         </div>
       )}

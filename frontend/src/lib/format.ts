@@ -93,3 +93,24 @@ export const EMOTION_META: Record<Emotion, { label: string; color: string; icon:
   anger: { label: "Anger", color: "var(--emo-anger)", icon: Angry },
   neutral: { label: "Neutral", color: "var(--emo-neutral)", icon: Meh },
 };
+
+type EmotionSource = NonNullable<AnalysisReport["emotion_source"]>;
+
+/** How each emotion source is described in the dashboard. */
+export const EMOTION_SOURCE: Record<EmotionSource, { from: string; sidebar: string; note: string }> = {
+  combined: {
+    from: "tone of voice and the words spoken",
+    sidebar: "voice + text",
+    note: "Emotions combine each speaker's voice (pitch, energy, rhythm), calibrated against how they sound across the whole recording, with the meaning of the words (RoBERTa GoEmotions). A line is only tagged with an emotion when it clearly stands out; everything else counts as neutral.",
+  },
+  audio: {
+    from: "tone of voice",
+    sidebar: "voice (wav2vec2)",
+    note: "Emotions are detected from each speaker's voice (pitch, energy, rhythm), calibrated against how they sound across the whole recording. The words aren't considered because the text model only understands English, so treat single-line tags as indicative.",
+  },
+  text: {
+    from: "the words spoken",
+    sidebar: "text (RoBERTa)",
+    note: "Emotions are detected from the words spoken (RoBERTa GoEmotions model), not from the voice, so sarcasm or tone may be missed.",
+  },
+};

@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { StackedBar } from "@/components/charts";
 import Timeline from "@/components/Timeline";
 import { Card, EmptyState, Legend, SectionHeader, SpeakerAvatar } from "@/components/ui";
-import { EMOTION_META, EMOTION_ORDER, formatClock, speakerName, type SpeakerMeta } from "@/lib/format";
+import { EMOTION_META, EMOTION_ORDER, EMOTION_SOURCE, formatClock, speakerName, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport } from "@/lib/types";
 
 export default function EmotionsSection({
@@ -36,7 +36,7 @@ export default function EmotionsSection({
       icon={Smile}
       eyebrow="Layer 04"
       title="Emotions"
-      description={`The emotional tone of each speaker, inferred line by line from ${report.emotion_source === "audio" ? "how they sounded" : "what they said"} and weighted by how long they spoke.`}
+      description={`The emotional tone of each speaker, inferred line by line from ${report.emotion_source ? EMOTION_SOURCE[report.emotion_source].from : "the recording"} and weighted by how long they spoke.`}
     />
   );
 
@@ -61,9 +61,7 @@ export default function EmotionsSection({
 
       <div className="flex items-start gap-2 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-xs leading-relaxed text-violet-900">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        {report.emotion_source === "audio"
-          ? "Emotions are detected from each speaker's voice (pitch, energy, rhythm) with a wav2vec2 speech-emotion model trained on acted English speech. Calm or monotone speakers tend to read as neutral, and the words themselves are not considered."
-          : "Emotions are detected from the words spoken (RoBERTa GoEmotions model), not from the voice, so sarcasm or tone may be missed."}
+        {EMOTION_SOURCE[report.emotion_source ?? "text"].note}
       </div>
 
       <div className={`grid gap-6 ${report.emotions.length > 2 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>

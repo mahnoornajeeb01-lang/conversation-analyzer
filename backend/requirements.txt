@@ -8,6 +8,9 @@ python-dotenv==1.0.1
 # Speech-to-text (runs locally; model is downloaded on first use)
 faster-whisper==1.2.1
 
+# Text emotion model (RoBERTa GoEmotions, ONNX)
+onnxruntime==1.30.0
+
 # PDF reports; the last two lay out right-to-left scripts (Urdu, Arabic) correctly
 reportlab==4.4.4
 arabic-reshaper==3.0.0

@@ -113,8 +113,8 @@ export interface AnalysisReport {
   transcript: Transcript | null;
   speaker_profiles: SpeakerProfile[];
   emotions: SpeakerEmotionSummary[] | null;
-  /** "audio" = tone of voice (wav2vec2), "text" = the words (RoBERTa). */
-  emotion_source: "audio" | "text" | null;
+  /** "combined" = voice + words, "audio" = tone of voice (wav2vec2), "text" = the words (RoBERTa). */
+  emotion_source: "combined" | "audio" | "text" | null;
   /** Seconds spent per pipeline stage, plus "total". */
   timings: Record<string, number>;
 }

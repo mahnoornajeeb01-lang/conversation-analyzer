@@ -190,7 +190,7 @@ class _Pipeline:
 
     def analyze(self, transcript: Transcript) -> AnalysisReport:
         tagged, emotion_source = _timed(
-            self.timings, "emotions", insights.tag_emotions, self.audio, transcript.segments
+            self.timings, "emotions", insights.tag_emotions, self.audio, transcript.segments, transcript.language
         )
 
         waited = time.perf_counter()

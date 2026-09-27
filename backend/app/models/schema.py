@@ -168,6 +168,8 @@ class AnalysisReport(BaseModel):
 
     speaker_profiles: List[SpeakerProfile] = []
     emotions: Optional[List[SpeakerEmotionSummary]] = None
-    emotion_source: Optional[Literal["audio", "text"]] = Field(None, description="Voice-tone model or words model")
+    emotion_source: Optional[Literal["combined", "audio", "text"]] = Field(
+        None, description="Voice and words combined, voice-tone model only, or words model only"
+    )
 
     timings: Dict[str, float] = Field(default_factory=dict, description="Seconds spent per pipeline stage")

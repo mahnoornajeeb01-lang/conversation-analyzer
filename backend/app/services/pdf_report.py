@@ -393,7 +393,8 @@ class _Builder:
             story.append(self.p("No overlapping speech was detected.", self.s_small))
 
         # Emotions
-        source = {"audio": "the tone of each speaker's voice (wav2vec2 speech-emotion model)",
+        source = {"combined": "the tone of each speaker's voice combined with the words spoken",
+                  "audio": "the tone of each speaker's voice (wav2vec2 speech-emotion model)",
                   "text": "the words spoken (RoBERTa GoEmotions text model)"}.get(r.emotion_source or "", "")
         story += self.section("Layer 04", "Emotions",
                               f"Detected line by line from {source}, weighted by how long each line lasts." if source
