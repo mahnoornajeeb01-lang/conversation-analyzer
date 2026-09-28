@@ -35,3 +35,4 @@ backend/System.Speech.Synthesis.SpeechSynthesizer
 
 # share.bat output
 share-link.txt
+backend.pid

@@ -4,21 +4,61 @@
 $root = $PSScriptRoot
 $site = "https://conversation-analyzer-iota-umber.vercel.app"
 $log = Join-Path $root "share-link.log"
+$backendLog = Join-Path $root "backend.log"
+$deployLog = Join-Path $root "share-deploy.log"
+$pidFile = Join-Path $root "backend.pid"
+$python = Join-Path $root "backend\venv\Scripts\python.exe"
 $cloudflared = Join-Path $env:USERPROFILE "tools\cloudflared.exe"
 if (-not (Test-Path $cloudflared)) { $cloudflared = "cloudflared" }
 
+if (-not (Test-Path $python)) {
+    Write-Host "No backend venv found. See backend\start.bat for how to create it." -ForegroundColor Red
+    exit 1
+}
+
 # Stop a previous run, so port 8000 is free and the log only holds this run's address.
 Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
+if (Test-Path $pidFile) {
+    taskkill /pid (Get-Content $pidFile) /t /f 2>$null | Out-Null
+    Remove-Item $pidFile
+}
+# Older runs used a visible console window for the backend.
 Get-Process cmd -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowTitle -like "Conversation Analyzer backend*" } |
+    Where-Object { $_.MainWindowTitle -like "*Conversation Analyzer backend*" } |
     ForEach-Object { taskkill /pid $_.Id /t /f | Out-Null }
 Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 Remove-Item $log -ErrorAction SilentlyContinue
 
-Start-Process cmd -ArgumentList "/k", "title Conversation Analyzer backend && backend\start.bat" -WorkingDirectory $root
-Start-Process $cloudflared -ArgumentList "tunnel", "--url", "http://localhost:8000", "--no-autoupdate", "--logfile", "`"$log`"" -WindowStyle Minimized
+# Rebuild the dashboard so the backend (and the tunnel address) serve the latest design.
+Write-Host "Building the dashboard..."
+Push-Location (Join-Path $root "frontend")
+$build = & npm.cmd run build 2>&1
+$built = $LASTEXITCODE -eq 0
+Pop-Location
+if (-not $built) {
+    Write-Host ($build | Select-Object -Last 15 | Out-String) -ForegroundColor DarkGray
+    Write-Host "Dashboard build failed; serving the previous build." -ForegroundColor Yellow
+}
+
+# Run the backend with no console window: clicking into a console puts it in "Select"
+# mode, which freezes the server until Esc is pressed. Output goes to backend.log, and
+# the loop restarts the server if it ever exits.
+$loop = @"
+Set-Location '$($root -replace "'", "''")\backend'
+while (`$true) {
+    Add-Content -Path '$($backendLog -replace "'", "''")' -Value "--- backend started `$(Get-Date)"
+    & '$($python -replace "'", "''")' -m uvicorn app.main:app --host 127.0.0.1 --port 8000 *>> '$($backendLog -replace "'", "''")'
+    Start-Sleep -Seconds 3
+}
+"@
+$backend = Start-Process (Join-Path $PSHOME "powershell.exe") -WindowStyle Hidden -PassThru `
+    -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($loop)))
+Set-Content -Path $pidFile -Value $backend.Id
+
+Start-Process $cloudflared -WindowStyle Hidden `
+    -ArgumentList "tunnel", "--url", "http://localhost:8000", "--no-autoupdate", "--logfile", "`"$log`""
 
 Write-Host "Starting the server and a public link, this takes about 30 seconds..."
 $tunnel = $null
@@ -30,7 +70,7 @@ for ($i = 0; $i -lt 60 -and -not $tunnel; $i++) {
     }
 }
 if (-not $tunnel) {
-    Write-Host "Could not get a tunnel address. Check the minimized tunnel window." -ForegroundColor Red
+    Write-Host "Could not get a tunnel address. See share-link.log." -ForegroundColor Red
     exit 1
 }
 
@@ -47,13 +87,15 @@ Push-Location (Join-Path $root "frontend")
 $deploy = & npx.cmd --yes vercel deploy --prod --yes --build-env "NEXT_PUBLIC_API_BASE_URL=$tunnel" 2>&1
 $deployed = $LASTEXITCODE -eq 0
 Pop-Location
+$deploy | Out-File -FilePath $deployLog -Encoding utf8
 
 if ($deployed) {
     $link = $site
 } else {
-    Write-Host ($deploy | Select-Object -Last 5 | Out-String) -ForegroundColor DarkGray
-    Write-Host "Vercel update failed; the link below still works because it carries the address." -ForegroundColor Yellow
-    $link = "$site/?server=$tunnel"
+    Write-Host ($deploy | Select-Object -Last 10 | Out-String) -ForegroundColor DarkGray
+    Write-Host "Vercel update failed (full output in share-deploy.log)." -ForegroundColor Yellow
+    Write-Host "Sharing this PC's own address instead: it serves the same dashboard and the analysis server." -ForegroundColor Yellow
+    $link = $tunnel
 }
 Set-Content -Path (Join-Path $root "share-link.txt") -Value $link
 Set-Clipboard -Value $link
@@ -62,5 +104,6 @@ Write-Host "  Share this link (copied to your clipboard, also saved in share-lin
 Write-Host ""
 Write-Host "  $link" -ForegroundColor Green
 Write-Host ""
-if (-not $ready) { Write-Host "  (The server is still starting; the link may need another minute.)" -ForegroundColor Yellow }
-Write-Host "Keep the backend window and the minimized tunnel window open while people use the link."
+if (-not $ready) { Write-Host "  (The server is still starting; the link may need another minute. See backend.log.)" -ForegroundColor Yellow }
+Write-Host "The server and tunnel run in the background (no windows to keep open) while this PC is awake."
+Write-Host "Run share.bat again to restart them with a new link."
