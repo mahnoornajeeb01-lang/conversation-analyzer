@@ -1,10 +1,9 @@
 """Speaker diarization: turns an audio file into a list of SpeakerSegment timestamps.
 
-Uses pyannote.audio's pretrained pipeline (`pyannote/speaker-diarization-3.1`) when it
-is installed, importable, and a HuggingFace access token is configured. Otherwise (or
-if the pipeline fails to load / run for any reason) it falls back to a deterministic
-mock generator so the rest of the application can be developed and tested without a
-GPU or gated model access.
+Uses pyannote.audio's pretrained pipeline (`pyannote/speaker-diarization-3.1`). If it
+can't be loaded or run, analysis fails with DiarizationUnavailable rather than reporting
+made-up numbers. The synthetic mock generator is only used when USE_MOCK_DIARIZATION is
+set, for developing without a GPU or gated model access.
 """
 
 from __future__ import annotations
@@ -26,6 +25,10 @@ _pipeline_load_failed = False
 _pipeline_lock = threading.Lock()
 
 SAMPLE_RATE = 16000
+
+
+class DiarizationUnavailable(RuntimeError):
+    """The pyannote pipeline couldn't be loaded or failed while running."""
 
 
 def _try_import_pyannote():
@@ -53,13 +56,13 @@ def _load_pipeline():
 
     pipeline_cls = _try_import_pyannote()
     if pipeline_cls is None:
-        logger.warning("pyannote.audio is not installed; diarization will use mock data.")
+        logger.warning("pyannote.audio is not installed; diarization is unavailable.")
         _pipeline_load_failed = True
         return None
 
     if not settings.huggingface_token:
         logger.warning(
-            "No HUGGINGFACE_TOKEN configured; diarization will use mock data. "
+            "No HUGGINGFACE_TOKEN configured; diarization is unavailable. "
             "Set HUGGINGFACE_TOKEN in backend/.env to enable pyannote.audio."
         )
         _pipeline_load_failed = True
@@ -78,7 +81,7 @@ def _load_pipeline():
         return _pipeline
     except Exception:
         logger.exception(
-            "Failed to load pyannote.audio pipeline '%s'; falling back to mock diarization.",
+            "Failed to load pyannote.audio pipeline '%s'.",
             settings.diarization_model,
         )
         _pipeline_load_failed = True
@@ -108,30 +111,28 @@ def _normalize_speaker_labels(raw_segments: List[Tuple[str, float, float]]) -> L
     ]
 
 
-def run_pyannote_diarization(audio: np.ndarray) -> Optional[List[SpeakerSegment]]:
+def run_pyannote_diarization(audio: np.ndarray) -> List[SpeakerSegment]:
     """Run pyannote.audio on 16 kHz mono audio (decoded once by the caller with
     PyAV, since torchaudio can't read mp3/m4a on Windows without FFmpeg).
-    Returns None if the pipeline is unavailable or fails, so callers can fall back to mock."""
+    Returns an empty list when no speech is found; raises DiarizationUnavailable if the
+    pipeline can't be loaded or fails."""
     pipeline = _get_pipeline()
     if pipeline is None:
-        return None
+        raise DiarizationUnavailable("The speaker diarization model could not be loaded.")
 
     try:
         import torch
 
         waveform = torch.from_numpy(np.ascontiguousarray(audio)).unsqueeze(0)
         diarization = pipeline({"waveform": waveform, "sample_rate": SAMPLE_RATE})
-    except Exception:
-        logger.exception("pyannote.audio diarization failed; using mock data.")
-        return None
+    except Exception as exc:
+        logger.exception("pyannote.audio diarization failed.")
+        raise DiarizationUnavailable("Speaker diarization failed while processing the recording.") from exc
 
     raw_segments: List[Tuple[str, float, float]] = [
         (speaker, turn.start, turn.end)
         for turn, _, speaker in diarization.itertracks(yield_label=True)
     ]
-
-    if not raw_segments:
-        return None
 
     return _normalize_speaker_labels(raw_segments)
 
@@ -191,10 +192,10 @@ def generate_mock_segments(
 
 def diarize_audio(audio: np.ndarray) -> Tuple[List[SpeakerSegment], str]:
     """Main entry point used by the API layer: produce speaker segments for 16 kHz
-    mono audio, returning (segments, source) where source is 'pyannote' or 'mock'."""
-    if not settings.use_mock_diarization:
-        segments = run_pyannote_diarization(audio)
-        if segments:
-            return segments, "pyannote"
+    mono audio, returning (segments, source) where source is 'pyannote' or 'mock'.
+    The segment list is empty when the recording contains no detectable speech."""
+    if settings.use_mock_diarization:
+        # Seeded by length so the same file always gets the same synthetic conversation.
+        return generate_mock_segments(duration_seconds=len(audio) / SAMPLE_RATE, seed=len(audio)), "mock"
 
-    return generate_mock_segments(duration_seconds=len(audio) / SAMPLE_RATE), "mock"
+    return run_pyannote_diarization(audio), "pyannote"

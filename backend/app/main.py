@@ -141,11 +141,15 @@ def _analyze(temp_path: Path, filename: str) -> AnalysisReport:
     started = time.perf_counter()
     timings: Dict[str, float] = {}
     audio = _timed(timings, "decode", _decode, temp_path)
-    speaker_segments, source = _timed(timings, "diarization", diarization.diarize_audio, audio)
+    try:
+        speaker_segments, source = _timed(timings, "diarization", diarization.diarize_audio, audio)
+    except diarization.DiarizationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"{exc} Please try again, or check the server log.") from exc
     if not speaker_segments:
         raise HTTPException(
             status_code=422,
-            detail="No speech segments could be detected in the uploaded audio.",
+            detail="No speech was detected in this recording, so there is nothing to measure. "
+            "Upload a recording of people talking.",
         )
     report = generate_report(speaker_segments, filename=filename, diarization_source=source)
     timings["total"] = round(time.perf_counter() - started, 2)
