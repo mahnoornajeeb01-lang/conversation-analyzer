@@ -1,7 +1,16 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { AudioLines, LayoutDashboard, Lock, LoaderCircle, Timer, Zap, type LucideIcon } from "lucide-react";
+import {
+  AudioLines,
+  CircleHelp,
+  LayoutDashboard,
+  LoaderCircle,
+  Lock,
+  Settings,
+  Timer,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { AnalysisReport } from "@/lib/types";
 
@@ -10,15 +19,14 @@ export type View = "overview" | "latency" | "interruptions";
 interface NavItem {
   key: View;
   label: string;
-  hint: string;
   icon: LucideIcon;
 }
 
-const OVERVIEW: NavItem = { key: "overview", label: "Overview", hint: "Upload & summary", icon: LayoutDashboard };
+const OVERVIEW: NavItem = { key: "overview", label: "Overview", icon: LayoutDashboard };
 
 const LAYERS: NavItem[] = [
-  { key: "latency", label: "Response Latency", hint: "Gaps between turns", icon: Timer },
-  { key: "interruptions", label: "Interruptions", hint: "Overlaps & floor-taking", icon: Zap },
+  { key: "latency", label: "Response latency", icon: Timer },
+  { key: "interruptions", label: "Interruptions", icon: Zap },
 ];
 
 export default function Sidebar({
@@ -32,8 +40,6 @@ export default function Sidebar({
   report: AnalysisReport | null;
   busy: boolean;
 }) {
-  const available = (key: View) => key === "overview" || Boolean(report);
-
   const badge = (key: View): string | null => {
     if (!report) return null;
     switch (key) {
@@ -46,141 +52,100 @@ export default function Sidebar({
     }
   };
 
-  const renderItem = (item: NavItem, index: number, step?: number) => {
-    const enabled = available(item.key);
+  const renderItem = (item: NavItem) => {
+    const enabled = item.key === "overview" || Boolean(report);
     const active = view === item.key;
     const Icon = item.icon;
     const b = badge(item.key);
-    const loading = !enabled && busy;
     return (
-      <motion.li
-        key={item.key}
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.05 * index, duration: 0.3 }}
-        className="group/item relative"
-      >
+      <li key={item.key}>
         <button
           type="button"
           disabled={!enabled}
           onClick={() => onNavigate(item.key)}
           aria-current={active ? "page" : undefined}
-          className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+          title={enabled ? undefined : busy ? "Unlocks when processing finishes" : "Upload a recording to unlock"}
+          className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
             active
-              ? "text-white"
+              ? "border-slate-200 bg-surface-solid font-semibold dark:bg-slate-100 text-slate-900 shadow-sm"
               : enabled
-                ? "text-slate-300 hover:bg-slate-800/50 hover:text-white"
-                : "cursor-not-allowed text-slate-400 opacity-50"
+                ? "border-transparent font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                : "cursor-not-allowed border-transparent font-medium text-slate-400"
           }`}
         >
-          {active && (
-            <motion.span
-              layoutId="nav-active"
-              transition={{ type: "spring", stiffness: 420, damping: 34 }}
-              className="absolute inset-0 rounded-xl border border-violet-500/40 bg-violet-600/20 shadow-[0_0_20px_rgba(139,92,246,0.25)]"
-            />
-          )}
-          <span
-            className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-              active
-                ? "bg-gradient-to-tr from-violet-600 to-indigo-500 text-white shadow-[0_0_14px_rgba(139,92,246,0.55)]"
-                : enabled
-                  ? "bg-white/[0.06] text-slate-300 group-hover/item:bg-white/10 group-hover/item:text-white"
-                  : "bg-white/[0.03] text-slate-500"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-          </span>
-          <span className="relative min-w-0 flex-1">
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              {step !== undefined && (
-                <span className="font-mono text-[10px] text-slate-500">{String(step).padStart(2, "0")}</span>
-              )}
-              {item.label}
-            </span>
-            <span className="block truncate text-[11px] text-slate-500">{item.hint}</span>
-          </span>
-          <span className="relative">
-            {loading ? (
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-violet-400" />
-            ) : !enabled ? (
-              <Lock className="h-3.5 w-3.5 text-slate-500" />
+          <Icon className={`h-4 w-4 shrink-0 ${active ? "text-violet-600" : ""}`} />
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          {!enabled ? (
+            busy ? (
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-violet-500" />
             ) : (
-              b && (
-                <span
-                  className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] ${
-                    active ? "bg-violet-400/20 text-violet-200" : "bg-white/[0.06] text-slate-400"
-                  }`}
-                >
-                  {b}
-                </span>
-              )
-            )}
-          </span>
+              <Lock className="h-3.5 w-3.5" />
+            )
+          ) : (
+            b && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{b}</span>
+            )
+          )}
         </button>
-
-        {!enabled && (
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute top-1/2 left-full z-50 ml-3 hidden w-max max-w-52 -translate-y-1/2 translate-x-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[11px] text-slate-200 opacity-0 shadow-xl transition duration-150 group-hover/item:translate-x-0 group-hover/item:opacity-100 lg:block"
-          >
-            {busy ? "Unlocks as soon as its data is ready" : "Upload a recording to unlock"}
-          </span>
-        )}
-      </motion.li>
+      </li>
     );
   };
 
+  const footerItem = (Icon: LucideIcon, label: string) => (
+    <li>
+      <button
+        type="button"
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        {label}
+      </button>
+    </li>
+  );
+
   return (
-    <aside className="keep-palette relative z-30 flex w-full shrink-0 flex-col border-white/[0.06] bg-[#0b0f19]/95 text-slate-200 backdrop-blur-xl lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-r">
-      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-        <motion.div
-          whileHover={{ rotate: -6, scale: 1.06 }}
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white shadow-[0_0_20px_rgba(139,92,246,0.45)]"
-        >
-          <AudioLines className="h-5 w-5" />
-        </motion.div>
-        <div>
-          <p className="text-[15px] font-bold tracking-tight text-white">Conversation Analyzer</p>
-          <p className="text-xs text-slate-400">Turn-taking &amp; timing</p>
+    <aside className="relative z-30 flex w-full shrink-0 flex-col border-b border-slate-200 bg-slate-50 dark:bg-surface-solid lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-r lg:border-b-0">
+      <div className="flex items-center gap-2.5 px-5 pt-5 pb-6">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 text-white shadow-sm">
+          <AudioLines className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold tracking-tight text-slate-900">Conversation Analyzer</p>
+          <p className="text-xs text-slate-500">Turn-taking &amp; timing</p>
         </div>
       </div>
 
-      <nav className="scroll-thin flex-1 overflow-y-auto px-3 pb-4 lg:overflow-visible">
-        <ul className="space-y-1">{renderItem(OVERVIEW, 0)}</ul>
+      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+        <ul className="space-y-1">{renderItem(OVERVIEW)}</ul>
 
-        <p className="mt-6 mb-2 px-3 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
+        <p className="mt-6 mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
           Analysis layers
         </p>
-        <ul className="relative space-y-1">
-          <span className="absolute top-5 bottom-5 left-[27px] w-px bg-gradient-to-b from-violet-500/30 via-white/[0.06] to-transparent" aria-hidden />
-          {LAYERS.map((item, i) => renderItem(item, i + 1, i + 1))}
-        </ul>
+        <ul className="space-y-1">{LAYERS.map(renderItem)}</ul>
 
         {!report && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mx-1 mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-xs leading-relaxed text-slate-400"
-          >
+          <p className="mt-2 px-3 text-xs leading-relaxed text-slate-400">
             {busy
-              ? "Processing your recording. Each layer unlocks as soon as its data is ready."
-              : "Upload a recording on the Overview screen to unlock the analysis layers."}
-          </motion.p>
+              ? "Processing your recording. Layers unlock when it finishes."
+              : "Layers unlock once a recording has been processed."}
+          </p>
         )}
       </nav>
 
-      {report && (
-        <div className="border-t border-white/[0.06] px-5 py-4 text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
+      <div className="border-t border-slate-200 px-3 py-3">
+        <ul className="space-y-1">
+          {footerItem(Settings, "Settings")}
+          {footerItem(CircleHelp, "Help & documentation")}
+        </ul>
+        {report && (
+          <p className="mt-2 flex items-center gap-2 px-3 text-[11px] text-slate-400">
             <span
-              className={`h-1.5 w-1.5 rounded-full ${report.diarization_source === "mock" ? "bg-amber-400" : "bg-emerald-400"}`}
+              className={`h-1.5 w-1.5 rounded-full ${report.diarization_source === "mock" ? "bg-amber-400" : "bg-emerald-500"}`}
             />
             Diarization: {report.diarization_source === "mock" ? "simulated" : "pyannote 3.1"}
-          </div>
-        </div>
-      )}
+          </p>
+        )}
+      </div>
     </aside>
   );
 }

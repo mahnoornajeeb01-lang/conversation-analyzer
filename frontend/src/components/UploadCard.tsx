@@ -1,7 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { FileAudio, Pause, Play, RotateCcw, Sparkles, UploadCloud } from "lucide-react";
+import { motion } from "framer-motion";
+import { FileAudio, Pause, Play, RotateCcw, UploadCloud } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { formatBytes, formatClock } from "@/lib/format";
@@ -113,7 +113,7 @@ export default function UploadCard({
   }
 
   return (
-    <motion.div
+    <div
       onDragOver={(e) => {
         e.preventDefault();
         if (!disabled) setDragging(true);
@@ -124,86 +124,58 @@ export default function UploadCard({
         setDragging(false);
         if (!disabled) pick(e.dataTransfer.files);
       }}
-      initial={{ opacity: 0, y: 12 }}
-      animate={dragging ? { opacity: 1, y: 0, scale: [1, 1.015, 1.01] } : { opacity: 1, y: 0, scale: 1 }}
-      transition={dragging ? { duration: 0.9, repeat: Infinity, repeatType: "reverse" } : { duration: 0.35 }}
-      className={`group relative overflow-hidden rounded-2xl border-2 border-dashed p-10 text-center backdrop-blur-xl transition-colors sm:p-12 ${
-        dragging
-          ? "border-violet-500 bg-violet-500/10"
-          : "border-slate-200 bg-surface hover:border-violet-500/60"
+      className={`flex h-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center shadow-sm transition-colors sm:px-10 ${
+        dragging ? "border-violet-500 bg-violet-50" : "border-slate-300 bg-surface hover:border-violet-400"
       }`}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.14),transparent_60%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100"
-      />
-      <div className="relative">
-        <motion.div
-          animate={dragging ? { y: [0, -8, 0] } : { y: 0 }}
-          transition={dragging ? { duration: 0.8, repeat: Infinity } : undefined}
-          whileHover={{ y: -4 }}
-          className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30"
-        >
-          <UploadCloud className="h-7 w-7" />
-        </motion.div>
+      <motion.span
+        animate={dragging ? { y: [0, -6, 0] } : { y: 0 }}
+        transition={dragging ? { duration: 0.8, repeat: Infinity } : undefined}
+        className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600"
+      >
+        <UploadCloud className="h-6 w-6" />
+      </motion.span>
 
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.h2
-            key={dragging ? "drop" : "idle"}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="mt-5 text-lg font-medium text-slate-900"
-          >
-            {dragging ? "Drop to start the analysis" : "Upload a conversation recording"}
-          </motion.h2>
-        </AnimatePresence>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
-          Drag and drop an audio file, or browse. We&apos;ll transcribe it, identify each speaker, and measure
-          response latency, interruptions and emotional tone.
-        </p>
+      <h2 className="mt-5 text-base font-semibold text-slate-900">
+        {dragging ? "Release to start the analysis" : "Drop an audio file to begin"}
+      </h2>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-500">
+        Upload a recorded conversation and we&apos;ll map who spoke when, how quickly each person responds, and who
+        interrupts whom.
+      </p>
 
-        <motion.button
+      <div className="mt-6 flex items-center gap-3">
+        <button
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.95 }}
-          className="mt-7 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2.5 font-medium text-white shadow-md transition-shadow hover:from-violet-500 hover:to-indigo-500 hover:shadow-[0_0_25px_rgba(124,58,237,0.5)] disabled:opacity-50"
+          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-50 dark:hover:bg-violet-600/90"
         >
-          <Sparkles className="h-4 w-4" />
           Browse files
-        </motion.button>
-
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
-          {FORMATS.map((f, i) => (
-            <motion.span
-              key={f}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.04 }}
-              className="rounded-md border border-slate-200 bg-slate-100/70 px-2.5 py-1 font-mono text-[11px] text-slate-500"
-            >
-              {f}
-            </motion.span>
-          ))}
-          <span className="mx-1 h-4 w-px bg-slate-200" aria-hidden />
-          <span className="text-[11px] text-slate-500">up to 200 MB</span>
-        </div>
-
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPTED}
-          className="hidden"
-          onChange={(e) => {
-            pick(e.target.files);
-            e.target.value = "";
-          }}
-        />
+        </button>
+        <span className="text-sm text-slate-500">or drag and drop</span>
       </div>
-    </motion.div>
+
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5">
+        {FORMATS.map((f) => (
+          <span key={f} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">
+            {f}
+          </span>
+        ))}
+        <span className="mx-1 h-3.5 w-px bg-slate-200" aria-hidden />
+        <span className="text-[11px] text-slate-500">Max 200 MB</span>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPTED}
+        className="hidden"
+        onChange={(e) => {
+          pick(e.target.files);
+          e.target.value = "";
+        }}
+      />
+    </div>
   );
 }

@@ -1,18 +1,21 @@
 "use client";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ChevronRight, FileDown, LoaderCircle, TriangleAlert } from "lucide-react";
+import { FileDown, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
+import RecentAnalyses from "@/components/RecentAnalyses";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
 import LatencySection from "@/components/sections/LatencySection";
 import Overview from "@/components/sections/Overview";
 import Sidebar, { type View } from "@/components/Sidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import UploadCard from "@/components/UploadCard";
+import WhatHappensNext from "@/components/WhatHappensNext";
 import { analyzeRecording, downloadReportPdf } from "@/lib/api";
 import { buildSpeakerMeta } from "@/lib/format";
+import { loadHistory, prependHistory, type AnalysisRecord } from "@/lib/history";
 import type { AnalysisReport } from "@/lib/types";
 
 const VIEW_TITLES: Record<View, string> = {
@@ -49,6 +52,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [history, setHistory] = useState<AnalysisRecord[]>([]);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -64,6 +68,16 @@ export default function DashboardPage() {
     stageRef.current = next;
     setStage(next);
   };
+
+  // Read after mount: localStorage isn't available during server rendering.
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
+
+  const recordRun = useCallback((record: Omit<AnalysisRecord, "id" | "uploadedAt">) => {
+    const uploadedAt = new Date().toISOString();
+    setHistory((list) => prependHistory(list, { ...record, id: `${uploadedAt}-${record.filename}`, uploadedAt }));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -120,6 +134,12 @@ export default function DashboardPage() {
             case "report":
               setReport(event.report);
               updateStage("done");
+              recordRun({
+                filename: selected.name,
+                duration: event.report.total_duration,
+                speakers: event.report.speaker_count,
+                status: "complete",
+              });
               break;
             case "error":
               throw new Error(event.detail);
@@ -136,8 +156,9 @@ export default function DashboardPage() {
       setFailedAt(pipelineStarted ? 1 : 0);
       setError((err as Error).message);
       updateStage("error");
+      recordRun({ filename: selected.name, duration: null, speakers: null, status: "failed" });
     }
-  }, []);
+  }, [recordRun]);
 
   const exportPdf = async () => {
     if (!report) return;
@@ -191,23 +212,22 @@ export default function DashboardPage() {
       <Sidebar view={view} onNavigate={navigate} report={report} busy={busy} />
 
       <main className="min-w-0 flex-1">
-        <div className="sticky top-0 z-40 border-b border-slate-200/60 bg-page/70 backdrop-blur-xl">
+        <div className="sticky top-0 z-40 border-b border-slate-200 bg-surface-solid/80 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
-            <nav className="flex min-w-0 items-center gap-1.5 text-sm">
-              <button type="button" onClick={() => navigate("overview")} className="hidden text-slate-500 transition hover:text-violet-600 sm:inline dark:hover:text-violet-400">
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
+              <button type="button" onClick={() => navigate("overview")} className="text-slate-500 transition-colors hover:text-slate-900">
                 Dashboard
               </button>
-              <ChevronRight className="hidden h-3.5 w-3.5 text-slate-300 sm:block" />
-              <span className="truncate font-semibold text-slate-900">{VIEW_TITLES[view]}</span>
+              <span className="text-slate-300" aria-hidden>/</span>
+              <span className="truncate font-medium text-slate-900" aria-current="page">{VIEW_TITLES[view]}</span>
             </nav>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <ThemeToggle />
               {report && (
                 <button
                   type="button"
                   onClick={exportPdf}
                   disabled={pdfBusy}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-md transition hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(124,58,237,0.5)] disabled:scale-100 disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:opacity-60 dark:hover:bg-violet-600/90"
                 >
                   {pdfBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
                   <span className="hidden sm:inline">{pdfBusy ? "Preparing PDF…" : "Download PDF"}</span>
@@ -215,12 +235,12 @@ export default function DashboardPage() {
                 </button>
               )}
               <span
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium backdrop-blur-xl ${
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
                   stage === "error"
                     ? "border-red-200 bg-red-50 text-red-700"
                     : busy
-                      ? "border-violet-500/30 bg-violet-500/10 text-violet-700"
-                      : "border-slate-200 bg-surface text-slate-700"
+                      ? "border-violet-200 bg-violet-50 text-violet-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
                 }`}
               >
                 {busy ? (
@@ -230,17 +250,18 @@ export default function DashboardPage() {
                     className={`h-2 w-2 rounded-full ${
                       stage === "error"
                         ? "bg-red-500"
-                        : "animate-pulse bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                        : "bg-emerald-500"
                     }`}
                   />
                 )}
                 <span className={stage === "done" ? "hidden sm:inline" : undefined}>
-                  {{ idle: "Ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
+                  {{ idle: "System ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
                 </span>
                 {stage === "done" && report?.timings.total ? (
                   <span className="hidden font-mono opacity-70 sm:inline">· {report.timings.total.toFixed(0)}s</span>
                 ) : null}
               </span>
+              <ThemeToggle />
             </div>
           </div>
           {file && view !== "overview" && <div className="mx-auto max-w-6xl px-5 pb-3 sm:px-8">{player}</div>}
@@ -283,10 +304,10 @@ export default function DashboardPage() {
               {view === "overview" && (
                 <>
                   <header>
-                    <p className="text-xs font-bold tracking-wider text-violet-600 uppercase dark:text-violet-400">
+                    <p className="text-xs font-semibold tracking-wider text-violet-600 uppercase dark:text-violet-700">
                       Conversation intelligence
                     </p>
-                    <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+                    <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
                       {report ? "Conversation overview" : "Analyze a conversation"}
                     </h1>
                     <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
@@ -296,8 +317,17 @@ export default function DashboardPage() {
                     </p>
                   </header>
 
-                  {file && <PipelineSteps stage={stage} failedAt={failedAt} />}
-                  {player}
+                  {file ? (
+                    <>
+                      <PipelineSteps stage={stage} failedAt={failedAt} />
+                      {player}
+                    </>
+                  ) : (
+                    <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+                      {player}
+                      <WhatHappensNext />
+                    </div>
+                  )}
 
                   {error && (
                     <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -315,6 +345,8 @@ export default function DashboardPage() {
                   {report && (
                     <Overview report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} onNavigate={navigate} />
                   )}
+
+                  <RecentAnalyses records={history} />
                 </>
               )}
 
