@@ -24,7 +24,16 @@ class Settings(BaseSettings):
     # every moment ~10x; 2.5 s measured 2.6x faster on CPU with identical accuracy.
     diarization_step_seconds: float = 2.5
 
-    # Load the diarization model at server start so the first upload doesn't wait for it.
+    # Speech-to-text (faster-whisper). Model sizes: tiny, base, small, medium, large-v3;
+    # larger is more accurate (especially for Urdu and other non-English speech) but
+    # slower on CPU. Downloaded once into whisper_cache_dir.
+    transcription_enabled: bool = True
+    whisper_model: str = "small"
+    whisper_compute_type: str = "int8"
+    whisper_beam_size: int = 5
+    whisper_cache_dir: Path = BACKEND_DIR / "models"
+
+    # Load the models at server start so the first upload doesn't wait for them.
     preload_models: bool = True
 
     # TrueType font for PDF reports. Empty = auto.

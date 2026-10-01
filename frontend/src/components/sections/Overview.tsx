@@ -6,6 +6,7 @@ import { Button } from "@/components/aria";
 import { ColumnChart } from "@/components/charts";
 import type { View } from "@/components/Sidebar";
 import Timeline, { CLASSIFICATION_META } from "@/components/Timeline";
+import { Utterance } from "@/components/sections/TranscriptSection";
 import { Card, Legend, SpeakerAvatar, StatCard } from "@/components/ui";
 import { formatClock, formatDuration, formatPercent, formatSeconds, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Classification } from "@/lib/types";
@@ -65,6 +66,44 @@ export default function Overview({
       >
         <Timeline report={report} speakers={speakers} currentTime={currentTime} onSeek={onSeek} />
       </Card>
+
+      {/* Transcript preview */}
+      {report.transcript ? (
+        <Card
+          title="Transcript"
+          subtitle={`${report.transcript.language_name} detected · ${report.transcript.word_count.toLocaleString()} words`}
+          action={<DetailsLink onPress={() => onNavigate("transcript")} />}
+          bodyClassName="p-0"
+        >
+          {report.transcript.segments.length ? (
+            <ol className="divide-y divide-slate-100">
+              {report.transcript.segments.slice(0, 4).map((s) => (
+                <Utterance
+                  key={`${s.start}-${s.speaker}`}
+                  segment={s}
+                  transcript={report.transcript!}
+                  speakers={speakers}
+                  active={currentTime >= s.start && currentTime < s.end}
+                  onSeek={onSeek}
+                />
+              ))}
+            </ol>
+          ) : (
+            <p className="py-8 text-center text-sm text-slate-500">No words were recognized in this recording.</p>
+          )}
+          {report.transcript.segments.length > 4 && (
+            <div className="border-t border-slate-100 px-5 py-3 text-center">
+              <Button variant="link" size="sm" onPress={() => onNavigate("transcript")}>
+                Read all {report.transcript.segments.length} utterances
+              </Button>
+            </div>
+          )}
+        </Card>
+      ) : report.transcript_error ? (
+        <Card title="Transcript" subtitle="What each speaker said">
+          <p className="text-sm text-slate-500">{report.transcript_error}</p>
+        </Card>
+      ) : null}
 
       {/* Speakers, latency and interruptions: 3 equal columns */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

@@ -3,6 +3,7 @@
 import {
   AudioLines,
   CircleHelp,
+  Languages,
   LayoutDashboard,
   LoaderCircle,
   Lock,
@@ -24,7 +25,7 @@ import {
 import { Button, focusRing, IconButton } from "@/components/aria";
 import type { AnalysisReport } from "@/lib/types";
 
-export type View = "overview" | "latency" | "interruptions";
+export type View = "overview" | "latency" | "interruptions" | "transcript";
 
 interface NavItem {
   key: View;
@@ -37,6 +38,7 @@ const OVERVIEW: NavItem = { key: "overview", label: "Overview", icon: LayoutDash
 const LAYERS: NavItem[] = [
   { key: "latency", label: "Response latency", icon: Timer },
   { key: "interruptions", label: "Interruptions", icon: Zap },
+  { key: "transcript", label: "Transcript", icon: Languages },
 ];
 
 const GLOSSARY = [
@@ -48,6 +50,10 @@ const GLOSSARY = [
   { term: "Floor transfer", text: "An interruption where the interrupter takes over and the other speaker stops." },
   { term: "Backchannel", text: "Both people keep talking through the overlap, e.g. “mm-hm” or competing for the floor." },
   { term: "Brief overlap", text: "A short, incidental overlap at a turn boundary." },
+  {
+    term: "Transcript",
+    text: "Speech-to-text by Whisper, which also detects the spoken language. Each word is credited to whoever was talking at that moment.",
+  },
 ];
 
 interface SidebarProps {
@@ -129,6 +135,8 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
         return `${report.latency_stats.average.toFixed(1)}s`;
       case "interruptions":
         return String(report.interruption_count);
+      case "transcript":
+        return report.transcript ? report.transcript.language.toUpperCase() : null;
       default:
         return null;
     }
@@ -200,6 +208,12 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
               className={`h-1.5 w-1.5 rounded-full ${report.diarization_source === "mock" ? "bg-amber-400" : "bg-emerald-500"}`}
             />
             Diarization: {report.diarization_source === "mock" ? "simulated" : "pyannote 3.1"}
+          </p>
+        )}
+        {report?.transcript && (
+          <p className="flex h-8 items-center gap-2 px-3 text-xs text-slate-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Speech-to-text: {report.transcript.model}
           </p>
         )}
       </div>

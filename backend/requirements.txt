@@ -22,3 +22,6 @@ torchaudio==2.5.1
 pyannote.audio==3.3.2
 huggingface_hub<1.0   # pyannote 3.3.x passes use_auth_token, removed in hub 1.0
 matplotlib            # imported by pyannote.audio but not declared as a dependency
+
+# Speech-to-text with language detection (Whisper on CTranslate2; the model downloads on first start)
+faster-whisper==1.2.1

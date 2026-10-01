@@ -12,7 +12,7 @@ from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FutureTimeout
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Callable, Dict, Generator, Iterator, Tuple, TypeVar
+from typing import Callable, Dict, Generator, Iterator, List, Tuple, TypeVar
 
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -22,8 +22,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
-from app.models.schema import AnalysisReport
-from app.services import diarization, pdf_report
+from app.models.schema import AnalysisReport, SpeakerSegment
+from app.services import diarization, pdf_report, transcription
 from app.services.analysis import generate_report
 
 logging.basicConfig(level=logging.INFO)
@@ -33,13 +33,15 @@ SAMPLE_RATE = 16000
 
 
 def _warm_up_models() -> None:
-    """Load the diarization model once so the first upload doesn't pay for it. Runs in
-    the background; a request arriving meanwhile simply waits on the loader's lock."""
+    """Load the diarization and speech-to-text models once so the first upload doesn't
+    pay for them. Runs in the background; a request arriving meanwhile simply waits on
+    the loaders' locks."""
     started = time.perf_counter()
-    try:
-        diarization.warm_up()
-    except Exception:
-        logger.exception("Warm-up of diarization failed; it will be retried on first use.")
+    for name, warm_up in (("diarization", diarization.warm_up), ("transcription", transcription.warm_up)):
+        try:
+            warm_up()
+        except Exception:
+            logger.exception("Warm-up of %s failed; it will be retried on first use.", name)
     logger.info("Models ready in %.1fs", time.perf_counter() - started)
 
 
@@ -136,8 +138,12 @@ def _timed(timings: Dict[str, float], key: str, fn, *args):
         timings[key] = round(time.perf_counter() - started, 2)
 
 
-def _analyze(temp_path: Path, filename: str) -> AnalysisReport:
-    """Decode, find who spoke when, then measure latency, overlaps and interruptions."""
+Analysis = Tuple[AnalysisReport, np.ndarray, List[SpeakerSegment], float]
+
+
+def _analyze_timing(temp_path: Path, filename: str) -> Analysis:
+    """Decode, find who spoke when, then measure latency, overlaps and interruptions.
+    Returns the report plus what transcription needs (audio, segments, start time)."""
     started = time.perf_counter()
     timings: Dict[str, float] = {}
     audio = _timed(timings, "decode", _decode, temp_path)
@@ -152,10 +158,26 @@ def _analyze(temp_path: Path, filename: str) -> AnalysisReport:
             "Upload a recording of people talking.",
         )
     report = generate_report(speaker_segments, filename=filename, diarization_source=source)
-    timings["total"] = round(time.perf_counter() - started, 2)
     report.timings = timings
-    logger.info("Analysis of '%s' finished: %s", filename, timings)
+    return report, audio, speaker_segments, started
+
+
+def _add_transcript(analysis: Analysis) -> AnalysisReport:
+    """Transcribe the recording into the report. A failure here keeps the timing
+    analysis and records why the transcript is missing."""
+    report, audio, speaker_segments, started = analysis
+    if settings.transcription_enabled:
+        try:
+            report.transcript = _timed(report.timings, "transcription", transcription.transcribe, audio, speaker_segments)
+        except transcription.TranscriptionUnavailable as exc:
+            report.transcript_error = str(exc)
+    report.timings["total"] = round(time.perf_counter() - started, 2)
+    logger.info("Analysis of '%s' finished: %s", report.filename, report.timings)
     return report
+
+
+def _analyze(temp_path: Path, filename: str) -> AnalysisReport:
+    return _add_transcript(_analyze_timing(temp_path, filename))
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)
@@ -213,8 +235,8 @@ async def analyze_audio_stream(file: UploadFile = File(...)) -> StreamingRespons
     """Same pipeline as /api/analyze, streamed as newline-delimited JSON with heartbeats
     so long recordings survive proxies.
 
-    Events: {"stage": "analyzing"} -> {"stage": "report", "report": {...}},
-    or {"stage": "error", "detail": "..."}.
+    Events: {"stage": "analyzing"} -> {"stage": "transcribing"} ->
+    {"stage": "report", "report": {...}}, or {"stage": "error", "detail": "..."}.
     """
     contents, extension = await _read_validated_upload(file)
     filename = file.filename or "recording"
@@ -224,7 +246,10 @@ async def analyze_audio_stream(file: UploadFile = File(...)) -> StreamingRespons
     def events() -> Iterator[bytes]:
         try:
             yield _event({"stage": "analyzing"})
-            report = yield from _with_heartbeat(lambda: _analyze(temp_path, filename))
+            analysis = yield from _with_heartbeat(lambda: _analyze_timing(temp_path, filename))
+            if settings.transcription_enabled:
+                yield _event({"stage": "transcribing"})
+            report = yield from _with_heartbeat(lambda: _add_transcript(analysis))
             yield _event({"stage": "report", "report": report.model_dump()})
         except HTTPException as exc:
             yield _event({"stage": "error", "detail": exc.detail})

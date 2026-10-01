@@ -51,6 +51,24 @@ export interface SpeakerProfile {
   turns: number;
 }
 
+export interface TranscriptSegment {
+  speaker: string | null;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Transcript {
+  /** ISO 639-1 code detected by Whisper, e.g. "en" or "ur". */
+  language: string;
+  language_name: string;
+  language_probability: number;
+  right_to_left: boolean;
+  segments: TranscriptSegment[];
+  word_count: number;
+  model: string;
+}
+
 export interface AnalysisReport {
   filename: string;
   total_duration: number;
@@ -67,11 +85,15 @@ export interface AnalysisReport {
   backchannel_count: number;
   diarization_source: "pyannote" | "mock";
   speaker_profiles: SpeakerProfile[];
+  /** Missing when speech-to-text is switched off or failed (see transcript_error). */
+  transcript?: Transcript | null;
+  transcript_error?: string | null;
   /** Seconds spent per pipeline stage, plus "total". */
   timings: Record<string, number>;
 }
 
 export type StreamEvent =
   | { stage: "analyzing" }
+  | { stage: "transcribing" }
   | { stage: "report"; report: AnalysisReport }
   | { stage: "error"; detail: string };

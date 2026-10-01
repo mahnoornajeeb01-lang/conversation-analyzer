@@ -6,6 +6,8 @@ export interface AnalysisRecord {
   /** Seconds, or null when the analysis failed before the duration was known. */
   duration: number | null;
   speakers: number | null;
+  /** Detected spoken language, e.g. "English". Absent on older records. */
+  language?: string | null;
   uploadedAt: string;
   status: "complete" | "failed";
 }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -96,6 +96,27 @@ class SpeakerProfile(BaseModel):
     turns: int
 
 
+class TranscriptSegment(BaseModel):
+    """One utterance: consecutive words from the same speaker."""
+
+    speaker: Optional[str] = Field(None, description="Diarization label of who said it")
+    start: float = Field(..., ge=0)
+    end: float = Field(..., ge=0)
+    text: str
+
+
+class Transcript(BaseModel):
+    """What was said, with the detected spoken language."""
+
+    language: str = Field(..., description="ISO 639-1 code detected by Whisper, e.g. 'en' or 'ur'")
+    language_name: str
+    language_probability: float = Field(..., ge=0, le=1)
+    right_to_left: bool = False
+    segments: List[TranscriptSegment]
+    word_count: int = 0
+    model: str = ""
+
+
 class AnalysisReport(BaseModel):
     """The complete structured result returned by POST /api/analyze."""
 
@@ -119,5 +140,8 @@ class AnalysisReport(BaseModel):
     diarization_source: Literal["pyannote", "mock"] = "mock"
 
     speaker_profiles: List[SpeakerProfile] = []
+
+    transcript: Optional[Transcript] = None
+    transcript_error: Optional[str] = Field(None, description="Why there is no transcript, when it failed")
 
     timings: Dict[str, float] = Field(default_factory=dict, description="Seconds spent per pipeline stage")

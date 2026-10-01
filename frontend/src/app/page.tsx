@@ -8,9 +8,11 @@ import { Breadcrumb, Breadcrumbs, Label, Link, ProgressBar } from "react-aria-co
 import { Button, focusRing } from "@/components/aria";
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
 import RecentAnalyses from "@/components/RecentAnalyses";
+import ScrollToggle from "@/components/ScrollToggle";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
 import LatencySection from "@/components/sections/LatencySection";
 import Overview from "@/components/sections/Overview";
+import TranscriptSection from "@/components/sections/TranscriptSection";
 import Sidebar, { MobileNav, type View } from "@/components/Sidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import UploadCard from "@/components/UploadCard";
@@ -25,19 +27,31 @@ const VIEW_TITLES: Record<View, string> = {
   overview: "Overview",
   latency: "Response Latency",
   interruptions: "Interruptions",
+  transcript: "Transcript",
 };
 
-function ProcessingCard() {
+const PROCESSING_TEXT = {
+  analyzing: {
+    title: "Analyzing who spoke when",
+    text: "Identifying the speakers, then measuring response latency and interruptions.",
+  },
+  transcribing: {
+    title: "Transcribing the conversation",
+    text: "Detecting the spoken language and converting the speech to text.",
+  },
+};
+
+function ProcessingCard({ stage }: { stage: keyof typeof PROCESSING_TEXT }) {
+  const { title, text } = PROCESSING_TEXT[stage];
   return (
     <div className="space-y-4">
       <ProgressBar isIndeterminate className="rounded-xl border border-slate-200 bg-surface p-5 shadow-xs">
         <div className="flex items-center gap-2 text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin text-violet-600" />
-          <Label className="font-medium text-slate-900">Analyzing recording</Label>
+          <Label className="font-medium text-slate-900">{title}</Label>
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          Identifying who spoke when, then measuring response latency and interruptions. Longer recordings can take a
-          couple of minutes.
+          {text} Longer recordings can take a few minutes.
         </p>
         <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div className="absolute inset-y-0 w-1/3 animate-[progress_1.4s_ease-in-out_infinite] rounded-full bg-violet-600" />
@@ -143,7 +157,8 @@ export default function DashboardPage() {
           pipelineStarted = true;
           switch (event.stage) {
             case "analyzing":
-              updateStage("analyzing");
+            case "transcribing":
+              updateStage(event.stage);
               break;
             case "report":
               setReport(event.report);
@@ -152,6 +167,7 @@ export default function DashboardPage() {
                 filename: selected.name,
                 duration: event.report.total_duration,
                 speakers: event.report.speaker_count,
+                language: event.report.transcript?.language_name ?? null,
                 status: "complete",
               });
               break;
@@ -204,7 +220,7 @@ export default function DashboardPage() {
     else audio.pause();
   };
 
-  const busy = stage === "analyzing";
+  const busy = stage === "analyzing" || stage === "transcribing";
 
   const player = (
     <UploadCard
@@ -232,41 +248,31 @@ export default function DashboardPage() {
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-2">
               <MobileNav {...sidebarProps} />
+              {/* On the overview "Dashboard" is the current page; elsewhere it links back to it. */}
               <Breadcrumbs className="flex min-w-0 items-center gap-2 text-sm">
-                <Breadcrumb className="flex items-center gap-2">
-                  <Link
-                    onPress={() => navigate("overview")}
-                    className={`cursor-pointer rounded text-slate-500 transition-colors hover:text-slate-900 ${focusRing}`}
-                  >
-                    Dashboard
-                  </Link>
-                  <ChevronRight className="h-3.5 w-3.5 text-slate-300" aria-hidden />
-                </Breadcrumb>
-                <Breadcrumb className="min-w-0">
-                  <Link className="block truncate font-medium text-slate-900">{VIEW_TITLES[view]}</Link>
-                </Breadcrumb>
+                {view === "overview" ? (
+                  <Breadcrumb>
+                    <Link className="font-medium text-slate-900">Dashboard</Link>
+                  </Breadcrumb>
+                ) : (
+                  <>
+                    <Breadcrumb className="flex items-center gap-2">
+                      <Link
+                        onPress={() => navigate("overview")}
+                        className={`cursor-pointer rounded text-slate-500 transition-colors hover:text-slate-900 ${focusRing}`}
+                      >
+                        Dashboard
+                      </Link>
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-300" aria-hidden />
+                    </Breadcrumb>
+                    <Breadcrumb className="min-w-0">
+                      <Link className="block truncate font-medium text-slate-900">{VIEW_TITLES[view]}</Link>
+                    </Breadcrumb>
+                  </>
+                )}
               </Breadcrumbs>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <span
-                className={`hidden h-8 items-center gap-2 rounded-full border px-3 text-xs font-medium sm:flex ${
-                  stage === "error"
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : busy
-                      ? "border-violet-200 bg-violet-50 text-violet-700"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                {busy ? (
-                  <LoaderCircle className="h-3 w-3 animate-spin" />
-                ) : (
-                  <span className={`h-2 w-2 rounded-full ${stage === "error" ? "bg-red-500" : "bg-emerald-500"}`} />
-                )}
-                {{ idle: "System ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
-                {stage === "done" && report?.timings.total ? (
-                  <span className="font-mono opacity-70">· {report.timings.total.toFixed(0)}s</span>
-                ) : null}
-              </span>
               {report && (
                 <Button variant="primary" onPress={exportPdf} isPending={pdfBusy}>
                   {pdfBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
@@ -280,7 +286,7 @@ export default function DashboardPage() {
           {file && view !== "overview" && <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">{player}</div>}
         </div>
 
-        <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl space-y-6 px-4 pt-8 pb-24 sm:px-6 lg:px-8">
           {audioUrl && (
             <audio
               ref={audioRef}
@@ -332,7 +338,7 @@ export default function DashboardPage() {
 
                   {error && <Alert title={failedAt === 0 ? "Upload failed" : "Analysis failed"}>{error}</Alert>}
 
-                  {busy && <ProcessingCard />}
+                  {(stage === "analyzing" || stage === "transcribing") && <ProcessingCard stage={stage} />}
                   {report && (
                     <Overview report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} onNavigate={navigate} />
                   )}
@@ -342,6 +348,9 @@ export default function DashboardPage() {
               )}
 
               {view === "latency" && report && <LatencySection report={report} speakers={speakers} onSeek={seek} />}
+              {view === "transcript" && report && (
+                <TranscriptSection report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} />
+              )}
               {view === "interruptions" && report && (
                 <InterruptionsSection report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} />
               )}
@@ -349,6 +358,7 @@ export default function DashboardPage() {
           </AnimatePresence>
         </div>
       </main>
+      <ScrollToggle />
     </div>
     </MotionConfig>
   );

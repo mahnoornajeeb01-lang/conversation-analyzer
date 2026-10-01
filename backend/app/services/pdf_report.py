@@ -1,5 +1,5 @@
 """Render an AnalysisReport as a PDF (reportlab): summary, speakers, timeline,
-response latency and interruptions.
+response latency, interruptions and the transcript.
 
 Text uses a system TrueType font when one is available, and right-to-left file names
 are reshaped/reordered so Urdu and Arabic read correctly.
@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 from reportlab.graphics.shapes import Drawing, Line, Rect, String
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -125,6 +125,7 @@ class _Builder:
         self.s_cell = ParagraphStyle("cell", fontSize=8, leading=10.5, **base)
         self.s_cell_b = ParagraphStyle("cellb", parent=self.s_cell, fontName=self.bold)
         self.s_kpi_v = ParagraphStyle("kpiv", fontName=self.bold, fontSize=15, leading=18, textColor=INK)
+        self.s_cell_rtl = ParagraphStyle("cellrtl", parent=self.s_cell, alignment=TA_RIGHT)
         self.s_kpi_l = ParagraphStyle("kpil", fontName=self.font, fontSize=7, leading=9, textColor=SECONDARY)
 
     def name(self, label: Optional[str]) -> str:
@@ -132,6 +133,19 @@ class _Builder:
 
     def p(self, text: str, style: ParagraphStyle) -> Paragraph:
         return Paragraph(escape(_shape(text)), style)
+
+    def rtl_paragraph(self, text: str, width: float) -> Paragraph:
+        """Right-to-left text wrapped in logical order first, then each line shaped, so
+        multi-line Urdu/Arabic reads top-to-bottom (reportlab wraps left-to-right)."""
+        style = self.s_cell_rtl
+        lines: List[List[str]] = [[]]
+        for word in text.split():
+            trial = " ".join(lines[-1] + [word])
+            if lines[-1] and pdfmetrics.stringWidth(_shape(trial), style.fontName, style.fontSize) > width:
+                lines.append([word])
+            else:
+                lines[-1].append(word)
+        return Paragraph("<br/>".join(escape(_shape(" ".join(line))) for line in lines), style)
 
     def section(self, eyebrow: str, title: str, lead: str) -> List:
         return [
@@ -332,11 +346,39 @@ class _Builder:
         else:
             story.append(self.p("No overlapping speech was detected.", self.s_small))
 
+        # Transcript
+        tr = r.transcript
+        if tr is not None or r.transcript_error:
+            lead = (
+                f"Detected language: {tr.language_name} ({round(tr.language_probability * 100)}% confidence) · "
+                f"{tr.word_count} words."
+                if tr
+                else "What each speaker said."
+            )
+            story += self.section("Layer 03", "Transcript", lead)
+            if tr and tr.segments:
+                text_w = content_w - 16 * mm - 28 * mm
+                rows = [["Time", "Speaker", "Text"]]
+                for seg in tr.segments:
+                    text = (
+                        self.rtl_paragraph(seg.text, text_w - 12)
+                        if tr.right_to_left
+                        else self.p(seg.text, self.s_cell)
+                    )
+                    rows.append([_clock(seg.start), self.p(self.name(seg.speaker), self.s_cell_b), text])
+                table = self.table(rows, [16 * mm, 28 * mm, None])
+                table.setStyle(TableStyle([("VALIGN", (0, 1), (-1, -1), "TOP")]))
+                story.append(table)
+            else:
+                story.append(self.p(r.transcript_error or "No words were recognized in this recording.", self.s_small))
+
         # Method notes
         notes = [
             f"Speaker diarization: {'pyannote/speaker-diarization-3.1' if r.diarization_source == 'pyannote' else 'simulated (illustrative only)'}.",
             "Latency is measured only for clean hand-offs between different speakers; overlapping turns are counted as interruptions instead.",
         ]
+        if r.transcript:
+            notes.append(f"Transcript: {r.transcript.model} (faster-whisper); each word is attributed to the speaker talking at that moment.")
         if r.timings.get("total"):
             notes.append(f"Processed in {r.timings['total']:.1f}s.")
         story += [Spacer(1, 6 * mm), KeepTogether([self.p("METHOD NOTES", self.s_eyebrow), Spacer(1, 1 * mm)]

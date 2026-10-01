@@ -24,13 +24,14 @@ export default function RecentAnalyses({ records }: { records: AnalysisRecord[] 
       }
       bodyClassName="overflow-x-auto"
     >
-      <Table aria-label="Recent analyses" className="w-full min-w-[640px] text-sm">
+      <Table aria-label="Recent analyses" className="w-full min-w-[720px] text-sm">
         <TableHeader className="border-b border-slate-200 bg-slate-50">
           <Column isRowHeader className={th}>
             Recording
           </Column>
           <Column className={th}>Duration</Column>
           <Column className={th}>Speakers</Column>
+          <Column className={th}>Language</Column>
           <Column className={th}>Uploaded</Column>
           <Column className={`${th} text-right`}>Status</Column>
         </TableHeader>
@@ -58,6 +59,7 @@ export default function RecentAnalyses({ records }: { records: AnalysisRecord[] 
                 {r.duration != null ? formatClock(r.duration) : "—"}
               </Cell>
               <Cell className={td}>{r.speakers ?? "—"}</Cell>
+              <Cell className={td}>{r.language ?? "—"}</Cell>
               <Cell className={`${td} text-xs text-slate-500`}>{uploadedFormat.format(new Date(r.uploadedAt))}</Cell>
               <Cell className={`${td} text-right`}>
                 <span

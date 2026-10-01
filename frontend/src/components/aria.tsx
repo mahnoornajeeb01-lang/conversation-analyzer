@@ -61,7 +61,7 @@ export function Tooltip({ children, ...props }: Omit<AriaTooltipProps, "children
       className="keep-palette group max-w-xs rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg ring-1 ring-white/10 transition-opacity duration-150 entering:opacity-0 exiting:opacity-0"
     >
       <OverlayArrow>
-        <svg width={8} height={8} viewBox="0 0 8 8" className="fill-slate-900 group-placement-bottom:rotate-180">
+        <svg width={8} height={8} viewBox="0 0 8 8" className="fill-slate-900 group-placement-bottom:rotate-180 group-placement-left:-rotate-90 group-placement-right:rotate-90">
           <path d="M0 0 L4 4 L8 0" />
         </svg>
       </OverlayArrow>
