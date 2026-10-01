@@ -62,7 +62,8 @@ export interface Transcript {
   /** ISO 639-1 code detected by Whisper, e.g. "en" or "ur". */
   language: string;
   language_name: string;
-  language_probability: number;
+  /** null when the analysis engine doesn't report it. */
+  language_probability: number | null;
   right_to_left: boolean;
   segments: TranscriptSegment[];
   word_count: number;
@@ -83,7 +84,7 @@ export interface AnalysisReport {
   interruption_count: number;
   successful_interruption_count: number;
   backchannel_count: number;
-  diarization_source: "pyannote" | "mock";
+  diarization_source: "pyannote" | "pyannoteai" | "mock";
   speaker_profiles: SpeakerProfile[];
   /** Missing when speech-to-text is switched off or failed (see transcript_error). */
   transcript?: Transcript | null;

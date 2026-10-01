@@ -1,0 +1,14 @@
+# Server-only dependencies for ANALYSIS_ENGINE=pyannoteai (e.g. Render's free tier):
+# pyannoteAI's API does the speech work, so torch, pyannote and Whisper aren't needed.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+numpy
+
+# PDF reports; the last two lay out right-to-left file names (Urdu, Arabic) correctly
+reportlab==4.4.4
+arabic-reshaper==3.0.0
+python-bidi==0.6.6

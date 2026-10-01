@@ -57,6 +57,8 @@ const GLOSSARY = [
   },
 ];
 
+const DIARIZATION_LABELS = { pyannote: "pyannote 3.1", pyannoteai: "pyannoteAI", mock: "simulated" } as const;
+
 interface SidebarProps {
   view: View;
   onNavigate: (view: View) => void;
@@ -137,7 +139,7 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
       case "interruptions":
         return String(report.interruption_count);
       case "transcript":
-        return report.transcript ? report.transcript.language.toUpperCase() : null;
+        return report.transcript?.language ? report.transcript.language.toUpperCase() : null;
       default:
         return null;
     }
@@ -215,7 +217,7 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
             <span
               className={`h-1.5 w-1.5 rounded-full ${report.diarization_source === "mock" ? "bg-amber-400" : "bg-emerald-500"}`}
             />
-            Diarization: {report.diarization_source === "mock" ? "simulated" : "pyannote 3.1"}
+            Diarization: {DIARIZATION_LABELS[report.diarization_source]}
           </p>
         )}
         {report?.transcript && (

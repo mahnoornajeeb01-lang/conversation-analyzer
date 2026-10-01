@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     whisper_beam_size: int = 5
     whisper_cache_dir: Path = BACKEND_DIR / "models"
 
+    # Where the speech work runs: "local" (the models above, on this machine) or
+    # "pyannoteai" (pyannoteAI's hosted API does diarization and speech-to-text, so the
+    # server needs no ML libraries and fits a small host such as Render's free tier).
+    analysis_engine: str = "local"
+    pyannoteai_api_key: str = ""
+    pyannoteai_model: str = "precision-2"
+    # Whisper large-v3-turbo is multilingual (incl. Urdu); the API's default, Parakeet,
+    # covers 25 European languages.
+    pyannoteai_transcription_model: str = "faster-whisper-large-v3-turbo"
+
     # Load the models at server start so the first upload doesn't wait for them.
     preload_models: bool = True
 

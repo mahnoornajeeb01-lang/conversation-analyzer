@@ -108,9 +108,9 @@ class TranscriptSegment(BaseModel):
 class Transcript(BaseModel):
     """What was said, with the detected spoken language."""
 
-    language: str = Field(..., description="ISO 639-1 code detected by Whisper, e.g. 'en' or 'ur'")
+    language: str = Field(..., description="ISO 639-1 code detected by Whisper, e.g. 'en' or 'ur'; empty when not reported")
     language_name: str
-    language_probability: float = Field(..., ge=0, le=1)
+    language_probability: Optional[float] = Field(None, ge=0, le=1, description="None when the engine doesn't report it")
     right_to_left: bool = False
     segments: List[TranscriptSegment]
     word_count: int = 0
@@ -137,7 +137,7 @@ class AnalysisReport(BaseModel):
     successful_interruption_count: int
     backchannel_count: int
 
-    diarization_source: Literal["pyannote", "mock"] = "mock"
+    diarization_source: Literal["pyannote", "pyannoteai", "mock"] = "mock"
 
     speaker_profiles: List[SpeakerProfile] = []
 

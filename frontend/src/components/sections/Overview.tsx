@@ -88,7 +88,7 @@ export default function Overview({
           {report.transcript ? (
             <Card
               title="Transcript"
-              subtitle={`${report.transcript.language_name} detected · ${report.transcript.word_count.toLocaleString()} words`}
+              subtitle={`${report.transcript.language ? `${report.transcript.language_name} detected · ` : ""}${report.transcript.word_count.toLocaleString()} words`}
               action={<DetailsLink onPress={() => onNavigate("transcript")} />}
               bodyClassName="p-0"
             >

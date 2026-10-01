@@ -58,6 +58,11 @@ _FONT_CANDIDATES: List[Tuple[str, Optional[str]]] = [
 ]
 _fonts: Optional[Tuple[str, str]] = None
 
+DIARIZATION_NAMES = {
+    "pyannote": "pyannote/speaker-diarization-3.1",
+    "pyannoteai": "pyannoteAI (hosted)",
+}
+
 
 def _register_fonts() -> Tuple[str, str]:
     global _fonts
@@ -349,12 +354,12 @@ class _Builder:
         # Transcript
         tr = r.transcript
         if tr is not None or r.transcript_error:
-            lead = (
-                f"Detected language: {tr.language_name} ({round(tr.language_probability * 100)}% confidence) · "
-                f"{tr.word_count} words."
-                if tr
-                else "What each speaker said."
-            )
+            if tr and tr.language_probability is not None:
+                lead = f"Detected language: {tr.language_name} ({round(tr.language_probability * 100)}% confidence) · {tr.word_count} words."
+            elif tr:
+                lead = f"{tr.word_count} words."
+            else:
+                lead = "What each speaker said."
             story += self.section("Layer 03", "Transcript", lead)
             if tr and tr.segments:
                 text_w = content_w - 16 * mm - 28 * mm
@@ -374,11 +379,12 @@ class _Builder:
 
         # Method notes
         notes = [
-            f"Speaker diarization: {'pyannote/speaker-diarization-3.1' if r.diarization_source == 'pyannote' else 'simulated (illustrative only)'}.",
+            f"Speaker diarization: {DIARIZATION_NAMES.get(r.diarization_source, 'simulated (illustrative only)')}.",
             "Latency is measured only for clean hand-offs between different speakers; overlapping turns are counted as interruptions instead.",
         ]
         if r.transcript:
-            notes.append(f"Transcript: {r.transcript.model} (faster-whisper); each word is attributed to the speaker talking at that moment.")
+            engine = "pyannoteAI" if r.diarization_source == "pyannoteai" else "faster-whisper"
+            notes.append(f"Transcript: {r.transcript.model} ({engine}); each word is attributed to the speaker talking at that moment.")
         if r.timings.get("total"):
             notes.append(f"Processed in {r.timings['total']:.1f}s.")
         story += [Spacer(1, 6 * mm), KeepTogether([self.p("METHOD NOTES", self.s_eyebrow), Spacer(1, 1 * mm)]

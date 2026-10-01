@@ -147,7 +147,8 @@ export default function TranscriptSection({
     URL.revokeObjectURL(url);
   };
 
-  const confidence = Math.round(transcript.language_probability * 100);
+  const confidence =
+    transcript.language_probability == null ? null : Math.round(transcript.language_probability * 100);
 
   return (
     <Stagger root className="space-y-6">
@@ -157,8 +158,12 @@ export default function TranscriptSection({
 
       <Reveal>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <MiniStat label="Language" value={transcript.language_name} hint={transcript.language.toUpperCase()} />
-          <MiniStat label="Detection confidence" value={`${confidence}%`} hint={confidence < 70 ? "low: may be mixed languages" : "detected automatically"} />
+          <MiniStat label="Language" value={transcript.language_name} hint={transcript.language.toUpperCase() || undefined} />
+          {confidence == null ? (
+            <MiniStat label="Speakers" value={new Set(transcript.segments.map((s) => s.speaker)).size} />
+          ) : (
+            <MiniStat label="Detection confidence" value={`${confidence}%`} hint={confidence < 70 ? "low: may be mixed languages" : "detected automatically"} />
+          )}
           <MiniStat label="Words" value={transcript.word_count.toLocaleString()} />
           <MiniStat label="Utterances" value={transcript.segments.length} hint={transcript.model} />
         </div>

@@ -1,0 +1,19 @@
+# Render Blueprint: New > Blueprint in the Render dashboard, pick this repository.
+services:
+  - type: web
+    name: conversation-analyzer
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ANALYSIS_ENGINE
+        value: pyannoteai
+      # From https://dashboard.pyannote.ai (API keys). Render asks for it on first deploy.
+      - key: PYANNOTEAI_API_KEY
+        sync: false
+      # Uploads are held in memory; keep them well inside the free tier's 512 MB.
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "100"
