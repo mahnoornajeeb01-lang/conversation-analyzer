@@ -40,6 +40,36 @@ def _try_import_pyannote():
         return None
 
 
+class _SkipSilentSpeakers:
+    """Wraps pyannote's speaker-embedding model so it only runs on speakers who talk.
+
+    pyannote extracts an embedding for each of its 3 local speaker slots in every analysis
+    window, but in a typical conversation about two thirds of those slots are silent (an
+    all-zero mask). Their embeddings are never used: clustering keeps only active speakers
+    and the pipeline then marks inactive ones as unassigned. Skipping them (returning NaN,
+    pyannote's own "no embedding" value) gives the same diarization ~3x faster.
+    """
+
+    def __init__(self, model):
+        self._model = model
+
+    def __getattr__(self, name):
+        return getattr(self._model, name)
+
+    def __call__(self, waveforms, masks=None):
+        if masks is None:
+            return self._model(waveforms)
+        active = (masks > 0).any(dim=1)
+        if active.all():
+            return self._model(waveforms, masks=masks)
+        if not active.any():
+            return np.full((len(waveforms), self._model.dimension), np.nan)
+        computed = self._model(waveforms[active], masks=masks[active])
+        embeddings = np.full((len(waveforms), computed.shape[1]), np.nan, dtype=computed.dtype)
+        embeddings[active.numpy()] = computed
+        return embeddings
+
+
 def _get_pipeline():
     """Lazily load and cache the pyannote.audio diarization pipeline."""
     with _pipeline_lock:
@@ -78,6 +108,8 @@ def _load_pipeline():
         segmentation = getattr(_pipeline, "_segmentation", None)
         if segmentation is not None and settings.diarization_step_seconds > 0:
             segmentation.step = min(settings.diarization_step_seconds, segmentation.duration)
+        if getattr(_pipeline, "_embedding", None) is not None:
+            _pipeline._embedding = _SkipSilentSpeakers(_pipeline._embedding)
         return _pipeline
     except Exception:
         logger.exception(
