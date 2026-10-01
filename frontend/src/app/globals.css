@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "tailwindcss-react-aria-components";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -7,9 +8,8 @@
   --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   /*
-   * Semantic surfaces: `bg-surface` for cards (translucent glass in dark mode),
-   * `bg-surface-solid` where content scrolls underneath (sticky table headers),
-   * `bg-page` for the canvas behind everything.
+   * Semantic surfaces: `bg-surface` for cards, `bg-surface-solid` where content
+   * scrolls underneath (sticky headers), `bg-page` for the canvas behind everything.
    */
   --color-surface: #ffffff;
   --color-surface-solid: #ffffff;
@@ -18,7 +18,7 @@
 
 /*
  * Data colours. Light steps are the validated categorical palette; dark steps are the
- * same hues re-stepped for the dark glass surface (#0d1423 effective) and validated
+ * same hues re-stepped for the dark surface (#111827) and validated
  * separately.
  */
 :root {
@@ -32,7 +32,6 @@
   --chart-axis: #cbd5e1;
   --chart-ink: #0f172a;
 
-  --ambient: linear-gradient(transparent, transparent);
 }
 
 /*
@@ -42,8 +41,8 @@
  */
 .dark {
   color-scheme: dark;
-  --color-surface: rgb(15 23 42 / 0.6);
-  --color-surface-solid: #0f1626;
+  --color-surface: #111827;
+  --color-surface-solid: #111827;
   --color-page: #0b0f19;
 
   --color-slate-50: oklch(24% 0.03 264);
@@ -93,9 +92,6 @@
   --chart-axis: #364058;
   --chart-ink: #e2e8f0;
 
-  --ambient: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(124, 58, 237, 0.2), transparent 65%),
-    radial-gradient(ellipse 45% 40% at 100% 0%, rgba(34, 211, 238, 0.08), transparent 60%),
-    radial-gradient(ellipse 40% 40% at 0% 100%, rgba(236, 72, 153, 0.07), transparent 60%);
 }
 
 /*
@@ -138,22 +134,10 @@
 }
 
 body {
-  background: var(--ambient), var(--color-page);
-  background-attachment: fixed;
+  background: var(--color-page);
   color: var(--color-slate-900);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "ss01", "cv11";
-}
-
-/* Neon accents */
-@utility glow-violet {
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
-}
-@utility glow-violet-strong {
-  box-shadow: 0 0 25px rgba(124, 58, 237, 0.5);
-}
-@utility text-glow {
-  text-shadow: 0 0 18px rgba(167, 139, 250, 0.45);
 }
 
 /* Theme switch: fade colours briefly, but never on first paint. */
@@ -181,5 +165,15 @@ body {
   .theme-transition,
   .theme-transition * {
     transition: none !important;
+  }
+}
+
+/* Indeterminate progress bar sweep */
+@keyframes progress {
+  from {
+    left: -33%;
+  }
+  to {
+    left: 100%;
   }
 }

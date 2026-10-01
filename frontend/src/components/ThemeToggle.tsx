@@ -1,9 +1,10 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ToggleButton, TooltipTrigger } from "react-aria-components";
 
+import { focusRing, Tooltip } from "@/components/aria";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 function apply(dark: boolean) {
@@ -21,8 +22,7 @@ export default function ThemeToggle() {
     setDark(document.documentElement.classList.contains("dark"));
   }, []);
 
-  const toggle = () => {
-    const next = !dark;
+  const toggle = (next: boolean) => {
     apply(next);
     setDark(next);
     try {
@@ -32,32 +32,17 @@ export default function ThemeToggle() {
     }
   };
 
-  const label = dark ? "Switch to light mode" : "Switch to dark mode";
-
   return (
-    <motion.button
-      type="button"
-      onClick={toggle}
-      aria-label={label}
-      title={label}
-      aria-pressed={dark ?? undefined}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.92 }}
-      className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-surface text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        {dark !== null && (
-          <motion.span
-            key={dark ? "sun" : "moon"}
-            initial={{ y: 14, rotate: -60, opacity: 0 }}
-            animate={{ y: 0, rotate: 0, opacity: 1 }}
-            exit={{ y: -14, rotate: 60, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </motion.button>
+    <TooltipTrigger delay={400}>
+      <ToggleButton
+        isSelected={dark ?? false}
+        onChange={toggle}
+        aria-label="Dark mode"
+        className={`flex h-9 w-9 shrink-0 cursor-default items-center justify-center rounded-lg border border-slate-200 bg-surface text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 pressed:bg-slate-100 ${focusRing}`}
+      >
+        {dark === null ? null : dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </ToggleButton>
+      <Tooltip>{dark ? "Switch to light mode" : "Switch to dark mode"}</Tooltip>
+    </TooltipTrigger>
   );
 }

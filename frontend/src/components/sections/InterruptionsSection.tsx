@@ -2,10 +2,11 @@
 
 import { Zap } from "lucide-react";
 import { useMemo } from "react";
+import { GridList, GridListItem } from "react-aria-components";
 
 import { BarList, StackedBar } from "@/components/charts";
 import Timeline, { CLASSIFICATION_META } from "@/components/Timeline";
-import { Card, EmptyState, Legend, MiniStat, SectionHeader } from "@/components/ui";
+import { Card, EmptyState, Insight, Legend, MiniStat, PageHeader } from "@/components/ui";
 import { formatClock, speakerName, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Classification } from "@/lib/types";
 
@@ -50,14 +51,13 @@ export default function InterruptionsSection({
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        icon={Zap}
+      <PageHeader
         eyebrow="Layer 02"
         title="Interruptions"
         description="Moments when both people spoke at once, classified by what happened next: did the interrupter take over, did both keep talking, or was it just a brief overlap?"
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <MiniStat label="Interruptions" value={report.interruption_count} />
         <MiniStat label="Floor transfers" value={report.successful_interruption_count} hint="interrupter took over" />
         <MiniStat label="Overlapping speech" value={`${overlapSeconds.toFixed(1)}s`} hint={`${(overlapShare * 100).toFixed(1)}% of the recording`} />
@@ -92,7 +92,7 @@ export default function InterruptionsSection({
                   return (
                     <li
                       key={k}
-                      className="flex items-start gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-slate-200 hover:bg-slate-50/60"
+                      className="flex items-center gap-3 rounded-lg border border-slate-100 p-3"
                     >
                       <span className={`rounded-lg border p-1.5 ${meta.chip}`}>
                         <Icon className="h-3.5 w-3.5" />
@@ -101,7 +101,7 @@ export default function InterruptionsSection({
                         <span className="block text-sm font-semibold text-slate-800">{meta.short}</span>
                         <span className="block text-xs text-slate-500">{meta.description}</span>
                       </span>
-                      <span className="text-lg font-semibold text-slate-900">{counts[k]}</span>
+                      <span className="text-lg font-semibold text-slate-900 tabular-nums">{counts[k]}</span>
                     </li>
                   );
                 })}
@@ -124,7 +124,7 @@ export default function InterruptionsSection({
                 const second = [...byInterrupter].sort((a, b) => b.total - a.total)[1];
                 if (!top || top.total === 0) return null;
                 return (
-                  <p className="mt-5 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                  <Insight>
                     {second && top.total === second.total ? (
                       <>Both speakers interrupted equally often.</>
                     ) : (
@@ -133,7 +133,7 @@ export default function InterruptionsSection({
                         most, starting {top.total} of {report.interruption_count} overlaps.
                       </>
                     )}
-                  </p>
+                  </Insight>
                 );
               })()}
             </Card>
@@ -148,39 +148,45 @@ export default function InterruptionsSection({
           </Card>
 
           <Card title="Interruption log" subtitle="Click an event to play it" bodyClassName="p-0">
-            <ul className="scroll-thin max-h-96 divide-y divide-slate-100 overflow-y-auto">
+            <GridList
+              aria-label="Interruption log"
+              onAction={(key) => {
+                const event = report.interruptions[Number(key)];
+                if (event) onSeek(Math.max(event.timestamp - 1, 0));
+              }}
+              className="scroll-thin max-h-96 divide-y divide-slate-100 overflow-y-auto outline-none"
+            >
               {report.interruptions.map((event, idx) => {
                 const meta = CLASSIFICATION_META[event.classification];
                 const Icon = meta.icon;
                 return (
-                  <li key={idx}>
-                    <button
-                      type="button"
-                      onClick={() => onSeek(Math.max(event.timestamp - 1, 0))}
-                      className="flex w-full items-center gap-4 px-5 py-3 text-left transition hover:bg-violet-50/50"
-                    >
-                      <span className={`rounded-lg border p-1.5 ${meta.chip}`}>
-                        <Icon className="h-3.5 w-3.5" />
+                  <GridListItem
+                    key={idx}
+                    id={idx}
+                    textValue={`${speakerName(speakers, event.interrupter)} talked over ${speakerName(speakers, event.interrupted)} at ${formatClock(event.timestamp)}`}
+                    className="flex cursor-pointer items-center gap-4 px-5 py-3 outline-none hover:bg-slate-50 focus-visible:bg-violet-50 pressed:bg-slate-100"
+                  >
+                    <span className={`rounded-lg border p-1.5 ${meta.chip}`}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-1.5 text-sm text-slate-800">
+                        <span className="h-2 w-2 rounded-full" style={{ background: speakers[event.interrupter]?.color }} />
+                        <strong className="font-semibold">{speakerName(speakers, event.interrupter)}</strong>
+                        <span className="text-slate-400">talked over</span>
+                        <span className="h-2 w-2 rounded-full" style={{ background: speakers[event.interrupted]?.color }} />
+                        <strong className="font-semibold">{speakerName(speakers, event.interrupted)}</strong>
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-1.5 text-sm text-slate-800">
-                          <span className="h-2 w-2 rounded-full" style={{ background: speakers[event.interrupter]?.color }} />
-                          <strong className="font-semibold">{speakerName(speakers, event.interrupter)}</strong>
-                          <span className="text-slate-400">talked over</span>
-                          <span className="h-2 w-2 rounded-full" style={{ background: speakers[event.interrupted]?.color }} />
-                          <strong className="font-semibold">{speakerName(speakers, event.interrupted)}</strong>
-                        </span>
-                        <span className="text-xs text-slate-500">{meta.short}</span>
-                      </span>
-                      <span className="text-right text-xs text-slate-500">
-                        <span className="block font-mono font-medium text-slate-800">{formatClock(event.timestamp)}</span>
-                        {event.overlap_duration.toFixed(2)}s overlap
-                      </span>
-                    </button>
-                  </li>
+                      <span className="text-xs text-slate-500">{meta.short}</span>
+                    </span>
+                    <span className="shrink-0 text-right text-xs text-slate-500">
+                      <span className="block font-mono font-medium text-slate-800 tabular-nums">{formatClock(event.timestamp)}</span>
+                      {event.overlap_duration.toFixed(2)}s overlap
+                    </span>
+                  </GridListItem>
                 );
               })}
-            </ul>
+            </GridList>
           </Card>
         </>
       )}

@@ -1,3 +1,5 @@
+import { Card } from "@/components/ui";
+
 const STEPS = [
   { title: "Speaker identification", text: "The recording is split into time-stamped turns, each attributed to a distinct speaker." },
   { title: "Response latency", text: "The gap between one speaker finishing and the next starting is measured for every turn." },
@@ -6,11 +8,8 @@ const STEPS = [
 
 export default function WhatHappensNext() {
   return (
-    <section className="rounded-xl border border-slate-200 bg-surface p-6 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">What happens next</h2>
-      <p className="mt-1 text-xs text-slate-500">Each recording runs through three stages.</p>
-
-      <ol className="mt-6">
+    <Card title="What happens next" subtitle="Each recording runs through three stages.">
+      <ol>
         {STEPS.map((step, i) => (
           <li key={step.title} className="relative flex gap-3.5 pb-6 last:pb-0">
             {i < STEPS.length - 1 && (
@@ -26,6 +25,6 @@ export default function WhatHappensNext() {
           </li>
         ))}
       </ol>
-    </section>
+    </Card>
   );
 }

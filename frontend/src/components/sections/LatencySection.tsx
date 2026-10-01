@@ -2,9 +2,10 @@
 
 import { Play, Timer } from "lucide-react";
 import { useMemo } from "react";
+import { Cell, Column, Row, Table, TableBody, TableHeader } from "react-aria-components";
 
 import { BarList, ColumnChart } from "@/components/charts";
-import { Card, EmptyState, MiniStat, SectionHeader } from "@/components/ui";
+import { Card, EmptyState, Insight, MiniStat, PageHeader } from "@/components/ui";
 import { formatClock, formatSeconds, speakerName, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport } from "@/lib/types";
 
@@ -59,14 +60,13 @@ export default function LatencySection({
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        icon={Timer}
+      <PageHeader
         eyebrow="Layer 01"
         title="Response Latency"
         description="How long each speaker waits before replying: the silence between one person finishing and the other starting. Around 0.2–1s feels natural in conversation."
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <MiniStat label="Average" value={formatSeconds(stats.average)} hint={`${stats.total_turns_analyzed} hand-offs`} />
         <MiniStat label="Median" value={formatSeconds(stats.median)} hint="typical reply" />
         <MiniStat label="Fastest" value={formatSeconds(stats.minimum)} />
@@ -135,10 +135,10 @@ export default function LatencySection({
                 }))}
               />
               {fastest && (
-                <p className="mt-5 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                <Insight>
                   <strong className="text-slate-900">{speakerName(speakers, fastest.speaker)}</strong> responds fastest,
                   averaging {formatSeconds(fastest.avg)} before speaking.
-                </p>
+                </Insight>
               )}
             </Card>
 
@@ -167,33 +167,40 @@ export default function LatencySection({
 
           <Card title="All hand-offs" subtitle="Click a row to play the moment before the reply" bodyClassName="p-0">
             <div className="scroll-thin max-h-96 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-surface-solid text-left text-[11px] tracking-wide text-slate-400 uppercase">
-                  <tr className="border-b border-slate-100">
-                    <th className="px-5 py-2.5 font-medium">#</th>
-                    <th className="px-3 py-2.5 font-medium">Time</th>
-                    <th className="px-3 py-2.5 font-medium">From → To</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Latency</th>
-                    <th className="px-5 py-2.5 text-right font-medium">Pace</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table
+                aria-label="All hand-offs"
+                onRowAction={(key) => {
+                  const l = report.latencies[Number(key)];
+                  if (l) onSeek(Math.max(l.previous_end - 1.5, 0));
+                }}
+                className="w-full min-w-[520px] text-sm"
+              >
+                <TableHeader className="sticky top-0 z-10 bg-surface-solid text-[11px] tracking-wide text-slate-500 uppercase shadow-[inset_0_-1px_0_var(--color-slate-100)]">
+                  <Column className="w-14 px-5 py-2.5 text-left font-medium outline-none">#</Column>
+                  <Column className="px-3 py-2.5 text-left font-medium outline-none">Time</Column>
+                  <Column isRowHeader className="px-3 py-2.5 text-left font-medium outline-none">
+                    From → To
+                  </Column>
+                  <Column className="px-3 py-2.5 text-right font-medium outline-none">Latency</Column>
+                  <Column className="px-5 py-2.5 text-right font-medium outline-none">Pace</Column>
+                </TableHeader>
+                <TableBody>
                   {report.latencies.map((l, i) => {
                     const band = bandOf(l.latency_seconds);
                     return (
-                      <tr
+                      <Row
                         key={i}
-                        onClick={() => onSeek(Math.max(l.previous_end - 1.5, 0))}
-                        className="group cursor-pointer border-b border-slate-50 transition hover:bg-violet-50/50"
+                        id={i}
+                        className="group cursor-pointer border-b border-slate-100 outline-none last:border-b-0 hover:bg-slate-50 focus-visible:bg-violet-50 pressed:bg-slate-100"
                       >
-                        <td className="px-5 py-2.5 font-mono text-xs text-slate-400">{i + 1}</td>
-                        <td className="px-3 py-2.5 font-mono text-xs text-slate-600">
+                        <Cell className="px-5 py-2.5 font-mono text-xs text-slate-400 tabular-nums">{i + 1}</Cell>
+                        <Cell className="px-3 py-2.5 font-mono text-xs text-slate-600 tabular-nums">
                           <span className="inline-flex items-center gap-1.5">
                             <Play className="h-3 w-3 text-slate-300 group-hover:text-violet-500" />
                             {formatClock(l.next_start)}
                           </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-slate-700">
+                        </Cell>
+                        <Cell className="px-3 py-2.5 text-slate-700">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="h-2 w-2 rounded-full" style={{ background: speakers[l.previous_speaker]?.color }} />
                             {speakerName(speakers, l.previous_speaker)}
@@ -201,20 +208,20 @@ export default function LatencySection({
                             <span className="h-2 w-2 rounded-full" style={{ background: speakers[l.next_speaker]?.color }} />
                             {speakerName(speakers, l.next_speaker)}
                           </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs font-semibold text-slate-900">
+                        </Cell>
+                        <Cell className="px-3 py-2.5 text-right font-mono text-xs font-semibold text-slate-900 tabular-nums">
                           {l.latency_seconds.toFixed(2)}s
-                        </td>
-                        <td className="px-5 py-2.5 text-right">
+                        </Cell>
+                        <Cell className="px-5 py-2.5 text-right">
                           <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${BAND_CHIP[band]}`}>
                             {BANDS[band].sub}
                           </span>
-                        </td>
-                      </tr>
+                        </Cell>
+                      </Row>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </Card>
         </>

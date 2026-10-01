@@ -173,8 +173,15 @@ export default function Timeline({
         </div>
 
         <div className="relative mt-2 ml-28 h-4 font-mono text-[10px] text-slate-400">
-          {ticks.map((t) => (
-            <span key={t} className="absolute -translate-x-1/2" style={{ left: `${(t / total) * 100}%` }}>
+          {ticks.map((t, i) => (
+            <span
+              key={t}
+              // The end label sits flush with the track's right edge; on phones only every other label fits.
+              className={`absolute ${t === total ? "-translate-x-full" : "-translate-x-1/2"} ${
+                i % 2 === 1 && t !== total ? "max-sm:hidden" : ""
+              } ${i === ticks.length - 2 && ticks[ticks.length - 1] === total ? "max-sm:hidden" : ""}`}
+              style={{ left: `${(t / total) * 100}%` }}
+            >
               {formatClock(t)}
             </span>
           ))}

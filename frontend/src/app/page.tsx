@@ -1,17 +1,20 @@
 "use client";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { FileDown, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ChevronRight, FileDown, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Breadcrumb, Breadcrumbs, Label, Link, ProgressBar } from "react-aria-components";
 
+import { Button, focusRing } from "@/components/aria";
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
 import RecentAnalyses from "@/components/RecentAnalyses";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
 import LatencySection from "@/components/sections/LatencySection";
 import Overview from "@/components/sections/Overview";
-import Sidebar, { type View } from "@/components/Sidebar";
+import Sidebar, { MobileNav, type View } from "@/components/Sidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import UploadCard from "@/components/UploadCard";
+import { Alert, PageHeader } from "@/components/ui";
 import WhatHappensNext from "@/components/WhatHappensNext";
 import { analyzeRecording, downloadReportPdf } from "@/lib/api";
 import { buildSpeakerMeta } from "@/lib/format";
@@ -26,18 +29,29 @@ const VIEW_TITLES: Record<View, string> = {
 
 function ProcessingCard() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-32 animate-pulse rounded-2xl border border-slate-200/80 bg-surface p-4 backdrop-blur-xl">
-          <div className="h-9 w-9 rounded-xl bg-slate-100" />
-          <div className="mt-5 h-3 w-20 rounded bg-slate-100" />
-          <div className="mt-2 h-6 w-28 rounded bg-slate-100" />
+    <div className="space-y-4">
+      <ProgressBar isIndeterminate className="rounded-xl border border-slate-200 bg-surface p-5 shadow-xs">
+        <div className="flex items-center gap-2 text-sm">
+          <LoaderCircle className="h-4 w-4 animate-spin text-violet-600" />
+          <Label className="font-medium text-slate-900">Analyzing recording</Label>
         </div>
-      ))}
-      <p className="col-span-full flex items-center gap-2 text-sm text-slate-500">
-        <LoaderCircle className="h-4 w-4 animate-spin text-violet-500 dark:text-violet-400" />
-        Identifying who spoke when, then measuring response latency and interruptions…
-      </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Identifying who spoke when, then measuring response latency and interruptions. Longer recordings can take a
+          couple of minutes.
+        </p>
+        <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div className="absolute inset-y-0 w-1/3 animate-[progress_1.4s_ease-in-out_infinite] rounded-full bg-violet-600" />
+        </div>
+      </ProgressBar>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-[118px] animate-pulse rounded-xl border border-slate-200 bg-surface p-5">
+            <div className="h-3 w-20 rounded bg-slate-100" />
+            <div className="mt-5 h-6 w-28 rounded bg-slate-100" />
+            <div className="mt-2 h-3 w-24 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -206,36 +220,36 @@ export default function DashboardPage() {
     />
   );
 
+  const sidebarProps = { view, onNavigate: navigate, report, busy };
+
   return (
     <MotionConfig reducedMotion="user">
-    <div className="flex min-h-screen flex-col lg:flex-row">
-      <Sidebar view={view} onNavigate={navigate} report={report} busy={busy} />
+    <div className="flex min-h-screen">
+      <Sidebar {...sidebarProps} />
 
       <main className="min-w-0 flex-1">
-        <div className="sticky top-0 z-40 border-b border-slate-200 bg-surface-solid/80 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
-            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
-              <button type="button" onClick={() => navigate("overview")} className="text-slate-500 transition-colors hover:text-slate-900">
-                Dashboard
-              </button>
-              <span className="text-slate-300" aria-hidden>/</span>
-              <span className="truncate font-medium text-slate-900" aria-current="page">{VIEW_TITLES[view]}</span>
-            </nav>
+        <div className="sticky top-0 z-40 border-b border-slate-200 bg-surface-solid/85 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-2">
+              <MobileNav {...sidebarProps} />
+              <Breadcrumbs className="flex min-w-0 items-center gap-2 text-sm">
+                <Breadcrumb className="flex items-center gap-2">
+                  <Link
+                    onPress={() => navigate("overview")}
+                    className={`cursor-pointer rounded text-slate-500 transition-colors hover:text-slate-900 ${focusRing}`}
+                  >
+                    Dashboard
+                  </Link>
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300" aria-hidden />
+                </Breadcrumb>
+                <Breadcrumb className="min-w-0">
+                  <Link className="block truncate font-medium text-slate-900">{VIEW_TITLES[view]}</Link>
+                </Breadcrumb>
+              </Breadcrumbs>
+            </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              {report && (
-                <button
-                  type="button"
-                  onClick={exportPdf}
-                  disabled={pdfBusy}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:opacity-60 dark:hover:bg-violet-600/90"
-                >
-                  {pdfBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{pdfBusy ? "Preparing PDF…" : "Download PDF"}</span>
-                  <span className="sm:hidden">PDF</span>
-                </button>
-              )}
               <span
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
+                className={`hidden h-8 items-center gap-2 rounded-full border px-3 text-xs font-medium sm:flex ${
                   stage === "error"
                     ? "border-red-200 bg-red-50 text-red-700"
                     : busy
@@ -246,28 +260,27 @@ export default function DashboardPage() {
                 {busy ? (
                   <LoaderCircle className="h-3 w-3 animate-spin" />
                 ) : (
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      stage === "error"
-                        ? "bg-red-500"
-                        : "bg-emerald-500"
-                    }`}
-                  />
+                  <span className={`h-2 w-2 rounded-full ${stage === "error" ? "bg-red-500" : "bg-emerald-500"}`} />
                 )}
-                <span className={stage === "done" ? "hidden sm:inline" : undefined}>
-                  {{ idle: "System ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
-                </span>
+                {{ idle: "System ready", analyzing: "Analyzing", done: "Analysis complete", error: "Failed" }[stage]}
                 {stage === "done" && report?.timings.total ? (
-                  <span className="hidden font-mono opacity-70 sm:inline">· {report.timings.total.toFixed(0)}s</span>
+                  <span className="font-mono opacity-70">· {report.timings.total.toFixed(0)}s</span>
                 ) : null}
               </span>
+              {report && (
+                <Button variant="primary" onPress={exportPdf} isPending={pdfBusy}>
+                  {pdfBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{pdfBusy ? "Preparing PDF…" : "Download PDF"}</span>
+                  <span className="sm:hidden">PDF</span>
+                </Button>
+              )}
               <ThemeToggle />
             </div>
           </div>
-          {file && view !== "overview" && <div className="mx-auto max-w-6xl px-5 pb-3 sm:px-8">{player}</div>}
+          {file && view !== "overview" && <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">{player}</div>}
         </div>
 
-        <div className="mx-auto max-w-6xl space-y-6 px-5 py-8 sm:px-8">
+        <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
           {audioUrl && (
             <audio
               ref={audioRef}
@@ -282,15 +295,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {pdfError && (
-            <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-semibold">PDF export failed</p>
-                <p>{pdfError}</p>
-              </div>
-            </div>
-          )}
+          {pdfError && <Alert title="PDF export failed">{pdfError}</Alert>}
 
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -303,19 +308,15 @@ export default function DashboardPage() {
             >
               {view === "overview" && (
                 <>
-                  <header>
-                    <p className="text-xs font-semibold tracking-wider text-violet-600 uppercase dark:text-violet-700">
-                      Conversation intelligence
-                    </p>
-                    <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
-                      {report ? "Conversation overview" : "Analyze a conversation"}
-                    </h1>
-                    <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
-                      {report
+                  <PageHeader
+                    eyebrow="Conversation intelligence"
+                    title={report ? "Conversation overview" : "Analyze a conversation"}
+                    description={
+                      report
                         ? "A summary of the whole recording. Click any card, or a layer in the sidebar, to open its detailed analysis."
-                        : "Upload a recording to see who spoke when, how quickly each person responds, and who interrupts whom."}
-                    </p>
-                  </header>
+                        : "Upload a recording to see who spoke when, how quickly each person responds, and who interrupts whom."
+                    }
+                  />
 
                   {file ? (
                     <>
@@ -323,23 +324,13 @@ export default function DashboardPage() {
                       {player}
                     </>
                   ) : (
-                    <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+                    <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                       {player}
                       <WhatHappensNext />
                     </div>
                   )}
 
-                  {error && (
-                    <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                      <div>
-                        <p className="font-semibold">
-                          {failedAt === 0 ? "Upload failed" : "Analysis failed"}
-                        </p>
-                        <p>{error}</p>
-                      </div>
-                    </div>
-                  )}
+                  {error && <Alert title={failedAt === 0 ? "Upload failed" : "Analysis failed"}>{error}</Alert>}
 
                   {busy && <ProcessingCard />}
                   {report && (

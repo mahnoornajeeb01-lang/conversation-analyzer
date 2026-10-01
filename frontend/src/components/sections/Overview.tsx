@@ -1,8 +1,8 @@
 "use client";
 
 import { ArrowRight, Clock, GitMerge, MessagesSquare, Repeat, Timer, Zap } from "lucide-react";
-import { motion } from "framer-motion";
 
+import { Button } from "@/components/aria";
 import { ColumnChart } from "@/components/charts";
 import type { View } from "@/components/Sidebar";
 import Timeline, { CLASSIFICATION_META } from "@/components/Timeline";
@@ -16,16 +16,12 @@ const CLASS_ORDER: Classification[] = [
   "Brief Overlap",
 ];
 
-function DetailsLink({ onClick, label = "View details" }: { onClick: () => void; label?: string }) {
+function DetailsLink({ onPress }: { onPress: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-violet-600 transition hover:bg-violet-50"
-    >
-      {label}
-      <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-    </button>
+    <Button variant="link" size="sm" onPress={onPress} className="group -my-1 -mr-2">
+      View details
+      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+    </Button>
   );
 }
 
@@ -52,13 +48,13 @@ export default function Overview({
   return (
     <div className="space-y-6">
       {/* Key numbers: 3 columns x 2 rows */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={Clock} label="Duration" value={formatDuration(report.total_duration)} hint={`${report.speaker_count} speakers`} accent="#2a78d6" delay={0} />
-        <StatCard icon={Timer} label="Avg. response" value={formatSeconds(report.latency_stats.average)} hint={`median ${formatSeconds(report.latency_stats.median)}`} accent="#7c3aed" onClick={() => onNavigate("latency")} delay={40} />
-        <StatCard icon={Repeat} label="Hand-offs" value={report.latency_stats.total_turns_analyzed} hint="clean speaker changes measured" accent="#7c3aed" onClick={() => onNavigate("latency")} delay={80} />
-        <StatCard icon={Zap} label="Interruptions" value={report.interruption_count} hint={`${report.successful_interruption_count} took the floor`} accent="#d03b3b" onClick={() => onNavigate("interruptions")} delay={120} />
-        <StatCard icon={MessagesSquare} label="Backchannels" value={report.backchannel_count} hint="both kept talking" accent="#eda100" onClick={() => onNavigate("interruptions")} delay={160} />
-        <StatCard icon={GitMerge} label="Overlaps" value={report.overlap_count} hint={`${overlapSeconds.toFixed(1)}s talking at once`} accent="#ea580c" onClick={() => onNavigate("interruptions")} delay={200} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+        <StatCard icon={Clock} label="Duration" value={formatDuration(report.total_duration)} hint={`${report.speaker_count} speakers`} accent="#2a78d6" />
+        <StatCard icon={Timer} label="Avg. response" value={formatSeconds(report.latency_stats.average)} hint={`median ${formatSeconds(report.latency_stats.median)}`} accent="#7c3aed" onPress={() => onNavigate("latency")} />
+        <StatCard icon={Repeat} label="Hand-offs" value={report.latency_stats.total_turns_analyzed} hint="clean speaker changes measured" accent="#7c3aed" onPress={() => onNavigate("latency")} />
+        <StatCard icon={Zap} label="Interruptions" value={report.interruption_count} hint={`${report.successful_interruption_count} took the floor`} accent="#d03b3b" onPress={() => onNavigate("interruptions")} />
+        <StatCard icon={MessagesSquare} label="Backchannels" value={report.backchannel_count} hint="both kept talking" accent="#eda100" onPress={() => onNavigate("interruptions")} />
+        <StatCard icon={GitMerge} label="Overlaps" value={report.overlap_count} hint={`${overlapSeconds.toFixed(1)}s talking at once`} accent="#ea580c" onPress={() => onNavigate("interruptions")} />
       </div>
 
       {/* Timeline */}
@@ -71,18 +67,13 @@ export default function Overview({
       </Card>
 
       {/* Speakers, latency and interruptions: 3 equal columns */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card title="Speakers" subtitle="Share of speaking time">
-          <ul className="space-y-4">
-            {report.speaker_profiles.map((profile, i) => {
+          <ul className="space-y-5">
+            {report.speaker_profiles.map((profile) => {
               const meta = speakers[profile.speaker];
               return (
-                <motion.li
-                  key={profile.speaker}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06, duration: 0.3 }}
-                >
+                <li key={profile.speaker}>
                   <div className="flex items-center gap-3">
                     <SpeakerAvatar initials={meta?.initials ?? "?"} color={meta?.color ?? "#64748b"} />
                     <div className="min-w-0 flex-1">
@@ -91,7 +82,7 @@ export default function Overview({
                         {formatDuration(profile.talk_time)} · {profile.turns} turns
                       </p>
                     </div>
-                    <p className="text-lg font-bold tracking-tight text-slate-900 tabular-nums">
+                    <p className="text-lg font-semibold tracking-tight text-slate-900 tabular-nums">
                       {formatPercent(profile.talk_share)}
                     </p>
                   </div>
@@ -101,7 +92,7 @@ export default function Overview({
                       style={{ width: `${profile.talk_share * 100}%`, background: meta?.color }}
                     />
                   </div>
-                </motion.li>
+                </li>
               );
             })}
           </ul>
@@ -110,7 +101,7 @@ export default function Overview({
         <Card
           title="Response latency"
           subtitle="Silence before each reply"
-          action={<DetailsLink onClick={() => onNavigate("latency")} />}
+          action={<DetailsLink onPress={() => onNavigate("latency")} />}
         >
           <ColumnChart
             height={180}
@@ -138,10 +129,10 @@ export default function Overview({
         <Card
           title="Interruptions"
           subtitle="When both spoke at once"
-          action={<DetailsLink onClick={() => onNavigate("interruptions")} />}
+          action={<DetailsLink onPress={() => onNavigate("interruptions")} />}
         >
           {report.interruptions.length ? (
-            <ul className="space-y-4">
+            <ul className="space-y-5">
               {classCounts.map(({ classification, count }) => {
                 const meta = CLASSIFICATION_META[classification];
                 const Icon = meta.icon;
