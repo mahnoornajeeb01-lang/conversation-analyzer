@@ -13,6 +13,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { LayoutGroup, motion } from "framer-motion";
 import {
   Button as AriaButton,
   Dialog,
@@ -90,7 +91,7 @@ function HelpDialog() {
         isDismissable
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm transition-opacity duration-200 entering:opacity-0 exiting:opacity-0"
       >
-        <Modal className="w-full max-w-lg rounded-xl border border-slate-200 bg-surface-solid shadow-2xl">
+        <Modal className="w-full max-w-lg rounded-xl border border-slate-200 bg-surface-solid shadow-2xl entering:animate-dialog-in exiting:animate-dialog-out">
           <Dialog className="outline-none">
             {({ close }) => (
               <>
@@ -153,12 +154,19 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
           isDisabled={!enabled}
           onPress={() => onNavigate(item.key)}
           aria-current={active ? "page" : undefined}
-          className={`flex h-9 w-full cursor-default items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors ${focusRing} ${
+          className={`relative flex h-9 w-full cursor-default items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors ${focusRing} ${
             active
-              ? "bg-violet-50 font-semibold text-violet-700"
+              ? "font-semibold text-violet-700"
               : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
           }`}
         >
+          {active && (
+            <motion.span
+              layoutId="nav-active"
+              className="absolute inset-0 -z-10 rounded-lg bg-violet-50"
+              transition={{ type: "spring", stiffness: 500, damping: 38 }}
+            />
+          )}
           <Icon className="h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
           {!enabled ? (
@@ -183,7 +191,7 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
     <>
       <Brand />
 
-      <nav aria-label="Main" className="scroll-thin flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Main" className="scroll-thin isolate flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">{renderItem(OVERVIEW)}</ul>
 
         <p className="mt-6 mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
@@ -225,7 +233,9 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
 export default function Sidebar(props: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-surface lg:flex">
-      <SidebarContent {...props} />
+      <LayoutGroup id="sidebar">
+        <SidebarContent {...props} />
+      </LayoutGroup>
     </aside>
   );
 }
@@ -239,16 +249,18 @@ export function MobileNav(props: SidebarProps) {
         isDismissable
         className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm transition-opacity duration-200 entering:opacity-0 exiting:opacity-0 lg:hidden"
       >
-        <Modal className="fixed inset-y-0 left-0 w-72 max-w-[85vw] border-r border-slate-200 bg-surface-solid shadow-2xl">
+        <Modal className="fixed inset-y-0 left-0 w-72 max-w-[85vw] border-r border-slate-200 bg-surface-solid shadow-2xl entering:animate-drawer-in exiting:animate-drawer-out">
           <Dialog aria-label="Navigation" className="flex h-full flex-col outline-none">
             {({ close }) => (
-              <SidebarContent
-                {...props}
-                onNavigate={(view) => {
-                  props.onNavigate(view);
-                  close();
-                }}
-              />
+              <LayoutGroup id="drawer">
+                <SidebarContent
+                  {...props}
+                  onNavigate={(view) => {
+                    props.onNavigate(view);
+                    close();
+                  }}
+                />
+              </LayoutGroup>
             )}
           </Dialog>
         </Modal>

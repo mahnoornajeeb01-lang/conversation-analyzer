@@ -155,11 +155,12 @@ export default function Timeline({
                     key={i}
                     onMouseMove={(e) => showTip(e, b.tip)}
                     onMouseLeave={() => setTip(null)}
-                    className="absolute top-1.5 bottom-1.5 rounded-[4px] transition hover:top-1 hover:bottom-1 hover:brightness-110"
+                    className="absolute top-1.5 bottom-1.5 origin-left animate-grow-x rounded-[4px] transition hover:top-1 hover:bottom-1 hover:brightness-110"
                     style={{
                       left: `${(b.start / total) * 100}%`,
                       width: `max(calc(${((b.end - b.start) / total) * 100}% - 2px), 2px)`,
                       background: b.color,
+                      animationDelay: `${100 + (b.start / total) * 500}ms`,
                     }}
                   />
                 ))}

@@ -3,10 +3,11 @@
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ChevronRight, FileDown, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Breadcrumb, Breadcrumbs, Label, Link, ProgressBar } from "react-aria-components";
+import { Breadcrumb, Breadcrumbs, Link } from "react-aria-components";
 
 import { Button, focusRing } from "@/components/aria";
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
+import ProcessingCard from "@/components/ProcessingCard";
 import RecentAnalyses from "@/components/RecentAnalyses";
 import ScrollToggle from "@/components/ScrollToggle";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
@@ -29,46 +30,6 @@ const VIEW_TITLES: Record<View, string> = {
   interruptions: "Interruptions",
   transcript: "Transcript",
 };
-
-const PROCESSING_TEXT = {
-  analyzing: {
-    title: "Analyzing who spoke when",
-    text: "Identifying the speakers, then measuring response latency and interruptions.",
-  },
-  transcribing: {
-    title: "Transcribing the conversation",
-    text: "Detecting the spoken language and converting the speech to text.",
-  },
-};
-
-function ProcessingCard({ stage }: { stage: keyof typeof PROCESSING_TEXT }) {
-  const { title, text } = PROCESSING_TEXT[stage];
-  return (
-    <div className="space-y-4">
-      <ProgressBar isIndeterminate className="rounded-xl border border-slate-200 bg-surface p-5 shadow-xs">
-        <div className="flex items-center gap-2 text-sm">
-          <LoaderCircle className="h-4 w-4 animate-spin text-violet-600" />
-          <Label className="font-medium text-slate-900">{title}</Label>
-        </div>
-        <p className="mt-1 text-xs text-slate-500">
-          {text} Longer recordings can take a few minutes.
-        </p>
-        <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div className="absolute inset-y-0 w-1/3 animate-[progress_1.4s_ease-in-out_infinite] rounded-full bg-violet-600" />
-        </div>
-      </ProgressBar>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-[118px] animate-pulse rounded-xl border border-slate-200 bg-surface p-5">
-            <div className="h-3 w-20 rounded bg-slate-100" />
-            <div className="mt-5 h-6 w-28 rounded bg-slate-100" />
-            <div className="mt-2 h-3 w-24 rounded bg-slate-100" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const [view, setView] = useState<View>("overview");
@@ -301,7 +262,11 @@ export default function DashboardPage() {
             />
           )}
 
-          {pdfError && <Alert title="PDF export failed">{pdfError}</Alert>}
+          {pdfError && (
+            <div className="animate-fade-up">
+              <Alert title="PDF export failed">{pdfError}</Alert>
+            </div>
+          )}
 
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -324,24 +289,54 @@ export default function DashboardPage() {
                     }
                   />
 
-                  {file ? (
-                    <>
-                      <PipelineSteps stage={stage} failedAt={failedAt} />
-                      {player}
-                    </>
-                  ) : (
-                    <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                      {player}
-                      <WhatHappensNext />
+                  {/* Dropping a file swaps the drop zone for the pipeline and player. */}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {file ? (
+                      <motion.div
+                        key="loaded"
+                        initial={{ opacity: 0, scale: 0.98, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        className="space-y-6"
+                      >
+                        <PipelineSteps stage={stage} failedAt={failedAt} />
+                        {player}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="empty"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97, filter: "blur(2px)" }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+                      >
+                        {player}
+                        <WhatHappensNext />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {error && (
+                    <div className="animate-fade-up">
+                      <Alert title={failedAt === 0 ? "Upload failed" : "Analysis failed"}>{error}</Alert>
                     </div>
                   )}
 
-                  {error && <Alert title={failedAt === 0 ? "Upload failed" : "Analysis failed"}>{error}</Alert>}
-
-                  {(stage === "analyzing" || stage === "transcribing") && <ProcessingCard stage={stage} />}
-                  {report && (
-                    <Overview report={report} speakers={speakers} currentTime={currentTime} onSeek={seek} onNavigate={navigate} />
-                  )}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {(stage === "analyzing" || stage === "transcribing") && <ProcessingCard key="processing" stage={stage} />}
+                    {report && (
+                      <Overview
+                        key="results"
+                        report={report}
+                        speakers={speakers}
+                        currentTime={currentTime}
+                        onSeek={seek}
+                        onNavigate={navigate}
+                      />
+                    )}
+                  </AnimatePresence>
 
                   <RecentAnalyses records={history} />
                 </>

@@ -47,7 +47,7 @@ export function Button({ variant = "secondary", size = "md", className, ...props
       className={composeRenderProps(
         className,
         (extra) =>
-          `inline-flex shrink-0 cursor-default items-center justify-center rounded-lg font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${focusRing} ${extra ?? ""}`,
+          `inline-flex shrink-0 cursor-default items-center justify-center rounded-lg font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,scale] duration-150 pressed:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${focusRing} ${extra ?? ""}`,
       )}
     />
   );

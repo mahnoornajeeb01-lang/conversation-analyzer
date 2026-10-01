@@ -43,9 +43,12 @@ function Player({
       <AriaButton
         onPress={onTogglePlay}
         aria-label={isPlaying ? "Pause" : "Play"}
-        className={`flex h-11 w-11 shrink-0 cursor-default items-center justify-center rounded-full bg-violet-600 text-white shadow-sm transition-colors hover:bg-violet-700 pressed:bg-violet-800 dark:hover:bg-violet-500 ${focusRing}`}
+        className={`relative flex h-11 w-11 shrink-0 cursor-default items-center justify-center rounded-full bg-violet-600 text-white shadow-sm transition-[background-color,scale] duration-150 hover:bg-violet-700 pressed:scale-95 pressed:bg-violet-800 dark:hover:bg-violet-500 ${focusRing}`}
       >
-        {isPlaying ? <Pause className="h-4.5 w-4.5" /> : <Play className="h-4.5 w-4.5 translate-x-px" />}
+        {isPlaying && <span className="absolute inset-0 animate-ping rounded-full bg-violet-500/40" aria-hidden />}
+        <span key={String(isPlaying)} className="relative block animate-pop">
+          {isPlaying ? <Pause className="h-4.5 w-4.5" /> : <Play className="h-4.5 w-4.5 translate-x-px" />}
+        </span>
       </AriaButton>
 
       <div className="min-w-0">
@@ -106,11 +109,11 @@ export default function UploadCard(props: UploadCardProps) {
         const item = e.items.find((i): i is FileDropItem => i.kind === "file");
         if (item) onFileSelected(await item.getFile());
       }}
-      className={`group flex h-full min-h-72 flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-surface px-6 py-12 text-center transition-colors hover:border-violet-400 drop-target:border-violet-500 drop-target:bg-violet-50 sm:px-10 ${focusRing}`}
+      className={`group flex h-full min-h-72 flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-surface px-6 py-12 text-center transition-[border-color,background-color,scale] duration-200 hover:border-violet-400 drop-target:scale-[1.01] drop-target:border-violet-500 drop-target:bg-violet-50 sm:px-10 ${focusRing}`}
     >
       {({ isDropTarget }) => (
         <>
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:text-violet-700">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600 transition-transform duration-300 group-hover:-translate-y-1 group-drop-target:animate-bounce dark:text-violet-700">
             <UploadCloud className="h-6 w-6" />
           </span>
 

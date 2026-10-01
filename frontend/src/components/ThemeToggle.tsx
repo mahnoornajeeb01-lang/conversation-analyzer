@@ -40,7 +40,12 @@ export default function ThemeToggle() {
         aria-label="Dark mode"
         className={`flex h-9 w-9 shrink-0 cursor-default items-center justify-center rounded-lg border border-slate-200 bg-surface text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 pressed:bg-slate-100 ${focusRing}`}
       >
-        {dark === null ? null : dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        {dark === null ? null : (
+          // Keyed so the new icon spins in on every switch.
+          <span key={String(dark)} className="block animate-spin-in">
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </span>
+        )}
       </ToggleButton>
       <Tooltip>{dark ? "Switch to light mode" : "Switch to dark mode"}</Tooltip>
     </TooltipTrigger>

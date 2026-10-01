@@ -112,7 +112,17 @@ export function ColumnChart({
             const dim = hover !== null && hover !== i;
             return (
               <g key={d.key}>
-                <path d={path} style={{ fill: d.color }} opacity={dim ? 0.35 : 1} className="transition-opacity" />
+                <path
+                  d={path}
+                  style={{
+                    fill: d.color,
+                    transformBox: "fill-box",
+                    transformOrigin: "bottom",
+                    animationDelay: `${150 + Math.min(i * 25, 600)}ms`,
+                  }}
+                  opacity={dim ? 0.35 : 1}
+                  className="animate-grow-y transition-opacity"
+                />
                 <rect
                   x={padL + band * i}
                   y={padT}
@@ -175,7 +185,7 @@ export function BarList({ rows, max }: { rows: BarRow[]; max?: number }) {
   const top = max ?? Math.max(...rows.map((r) => r.value), 0);
   return (
     <div className="space-y-3.5">
-      {rows.map((row) => (
+      {rows.map((row, i) => (
         <div
           key={row.key}
           className="group relative"
@@ -188,8 +198,12 @@ export function BarList({ rows, max }: { rows: BarRow[]; max?: number }) {
           </div>
           <div className="h-2.5 rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full transition-[width,filter] duration-500 group-hover:brightness-110"
-              style={{ width: `${top > 0 ? Math.max((row.value / top) * 100, row.value > 0 ? 1.5 : 0) : 0}%`, background: row.color }}
+              className="h-full origin-left animate-grow-x rounded-full transition-[width,filter] duration-500 group-hover:brightness-110"
+              style={{
+                width: `${top > 0 ? Math.max((row.value / top) * 100, row.value > 0 ? 1.5 : 0) : 0}%`,
+                background: row.color,
+                animationDelay: `${150 + i * 80}ms`,
+              }}
             />
           </div>
           {hover === row.key && row.tooltip && (
@@ -227,12 +241,17 @@ export function StackedBar({ parts, height = 14 }: { parts: StackPart[]; height?
   return (
     <div className="relative" onMouseLeave={() => setHover(null)}>
       <div className="flex w-full gap-[2px] overflow-hidden rounded-full" style={{ height }}>
-        {segments.map((s) => (
+        {segments.map((s, i) => (
           <div
             key={s.key}
             onMouseEnter={() => setHover(s.key)}
-            className="h-full transition-opacity"
-            style={{ width: `${s.pct}%`, background: s.color, opacity: hover && hover !== s.key ? 0.4 : 1 }}
+            className="h-full origin-left animate-grow-x transition-opacity"
+            style={{
+              width: `${s.pct}%`,
+              background: s.color,
+              opacity: hover && hover !== s.key ? 0.4 : 1,
+              animationDelay: `${150 + i * 120}ms`,
+            }}
           />
         ))}
       </div>

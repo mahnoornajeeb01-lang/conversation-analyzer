@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button as AriaButton, TooltipTrigger } from "react-aria-components";
 
@@ -35,7 +35,6 @@ export default function ScrollToggle() {
   }, []);
 
   const label = goUp ? "Back to top" : "Scroll to bottom";
-  const Icon = goUp ? ArrowUp : ArrowDown;
 
   return (
     <div
@@ -51,9 +50,10 @@ export default function ScrollToggle() {
           onPress={() =>
             window.scrollTo({ top: goUp ? 0 : document.documentElement.scrollHeight, behavior: "smooth" })
           }
-          className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-surface-solid text-slate-700 shadow-lg transition-colors hover:bg-slate-50 hover:text-violet-700 pressed:bg-slate-100 ${focusRing}`}
+          className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-surface-solid text-slate-700 shadow-lg transition-[color,background-color,translate,scale] hover:-translate-y-0.5 hover:bg-slate-50 hover:text-violet-700 pressed:scale-95 pressed:bg-slate-100 ${focusRing}`}
         >
-          <Icon className="h-4.5 w-4.5" />
+          {/* One arrow that flips, rather than swapping icons. */}
+          <ArrowDown className={`h-4.5 w-4.5 transition-transform duration-300 ${goUp ? "rotate-180" : ""}`} />
         </AriaButton>
         <Tooltip placement="left">{label}</Tooltip>
       </TooltipTrigger>

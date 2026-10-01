@@ -91,7 +91,7 @@ export function StatCard({
       <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
         <span className="truncate">{hint}</span>
         {onPress && (
-          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-colors group-hover:text-violet-600" />
+          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-[color,translate] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-violet-600" />
         )}
       </div>
     </>
@@ -100,7 +100,7 @@ export function StatCard({
   return onPress ? (
     <AriaButton
       onPress={onPress}
-      className={`group ${base} cursor-pointer transition-[border-color,box-shadow] hover:border-violet-300 hover:shadow-md pressed:bg-slate-50 ${focusRing}`}
+      className={`group ${base} cursor-pointer transition-[border-color,box-shadow,translate,scale] duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md pressed:scale-[0.99] pressed:bg-slate-50 ${focusRing}`}
     >
       {body}
     </AriaButton>

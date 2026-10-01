@@ -8,6 +8,7 @@ import { Button, focusRing } from "@/components/aria";
 import { Card, EmptyState, MiniStat, PageHeader, SpeakerAvatar } from "@/components/ui";
 import { formatClock, speakerName, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Transcript, TranscriptSegment } from "@/lib/types";
+import { Reveal, Stagger } from "@/components/motion";
 
 /** Plain-text transcript, one "[m:ss] Speaker: text" line per utterance. */
 export function transcriptText(transcript: Transcript, speakers: Record<string, SpeakerMeta>): string {
@@ -109,16 +110,20 @@ export default function TranscriptSection({
 
   if (!transcript) {
     return (
-      <div className="space-y-6">
-        {header}
-        <Card>
-          <EmptyState
-            icon={Languages}
-            title="No transcript for this recording"
-            text={report.transcript_error ?? "Speech-to-text is switched off on the analysis server."}
-          />
-        </Card>
-      </div>
+      <Stagger root className="space-y-6">
+        <Reveal>
+          {header}
+        </Reveal>
+        <Reveal>
+          <Card>
+            <EmptyState
+              icon={Languages}
+              title="No transcript for this recording"
+              text={report.transcript_error ?? "Speech-to-text is switched off on the analysis server."}
+            />
+          </Card>
+        </Reveal>
+      </Stagger>
     );
   }
 
@@ -145,76 +150,82 @@ export default function TranscriptSection({
   const confidence = Math.round(transcript.language_probability * 100);
 
   return (
-    <div className="space-y-6">
-      {header}
+    <Stagger root className="space-y-6">
+      <Reveal>
+        {header}
+      </Reveal>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MiniStat label="Language" value={transcript.language_name} hint={transcript.language.toUpperCase()} />
-        <MiniStat label="Detection confidence" value={`${confidence}%`} hint={confidence < 70 ? "low: may be mixed languages" : "detected automatically"} />
-        <MiniStat label="Words" value={transcript.word_count.toLocaleString()} />
-        <MiniStat label="Utterances" value={transcript.segments.length} hint={transcript.model} />
-      </div>
+      <Reveal>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <MiniStat label="Language" value={transcript.language_name} hint={transcript.language.toUpperCase()} />
+          <MiniStat label="Detection confidence" value={`${confidence}%`} hint={confidence < 70 ? "low: may be mixed languages" : "detected automatically"} />
+          <MiniStat label="Words" value={transcript.word_count.toLocaleString()} />
+          <MiniStat label="Utterances" value={transcript.segments.length} hint={transcript.model} />
+        </div>
+      </Reveal>
 
-      <Card
-        title="Full transcript"
-        subtitle="Press a timestamp to play from there. The line being played is highlighted."
-        bodyClassName="p-0"
-        action={
-          <div className="flex items-center gap-2">
-            <Button size="sm" onPress={copy} isDisabled={!transcript.segments.length}>
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copied" : "Copy"}
-            </Button>
-            <Button size="sm" onPress={download} isDisabled={!transcript.segments.length}>
-              <Download className="h-3.5 w-3.5" />
-              .txt
-            </Button>
-          </div>
-        }
-      >
-        {transcript.segments.length === 0 ? (
-          <EmptyState icon={Languages} title="No words recognized" text="Whisper didn't recognize any words in this recording." />
-        ) : (
-          <>
-            <div className="border-b border-slate-100 px-5 py-3">
-              <SearchField aria-label="Search the transcript" value={query} onChange={setQuery} className="group relative max-w-sm">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  placeholder="Search the transcript"
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-surface pr-9 pl-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 [&::-webkit-search-cancel-button]:hidden"
-                />
-                <AriaButton
-                  className={`absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 group-empty:hidden ${focusRing}`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </AriaButton>
-              </SearchField>
-              {query && (
-                <p className="mt-2 text-xs text-slate-500" aria-live="polite">
-                  {visible.length} of {transcript.segments.length} utterances match
-                </p>
-              )}
+      <Reveal>
+        <Card
+          title="Full transcript"
+          subtitle="Press a timestamp to play from there. The line being played is highlighted."
+          bodyClassName="p-0"
+          action={
+            <div className="flex items-center gap-2">
+              <Button size="sm" onPress={copy} isDisabled={!transcript.segments.length}>
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+              <Button size="sm" onPress={download} isDisabled={!transcript.segments.length}>
+                <Download className="h-3.5 w-3.5" />
+                .txt
+              </Button>
             </div>
-            {visible.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-slate-500">Nothing in the transcript matches “{query}”.</p>
-            ) : (
-              <ol className="divide-y divide-slate-100">
-                {visible.map((s) => (
-                  <Utterance
-                    key={`${s.start}-${s.speaker}`}
-                    segment={s}
-                    transcript={transcript}
-                    speakers={speakers}
-                    active={currentTime >= s.start && currentTime < s.end}
-                    query={query.trim()}
-                    onSeek={onSeek}
+          }
+        >
+          {transcript.segments.length === 0 ? (
+            <EmptyState icon={Languages} title="No words recognized" text="Whisper didn't recognize any words in this recording." />
+          ) : (
+            <>
+              <div className="border-b border-slate-100 px-5 py-3">
+                <SearchField aria-label="Search the transcript" value={query} onChange={setQuery} className="group relative max-w-sm">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    placeholder="Search the transcript"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-surface pr-9 pl-9 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 [&::-webkit-search-cancel-button]:hidden"
                   />
-                ))}
-              </ol>
-            )}
-          </>
-        )}
-      </Card>
-    </div>
+                  <AriaButton
+                    className={`absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 group-empty:hidden ${focusRing}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </AriaButton>
+                </SearchField>
+                {query && (
+                  <p className="mt-2 text-xs text-slate-500" aria-live="polite">
+                    {visible.length} of {transcript.segments.length} utterances match
+                  </p>
+                )}
+              </div>
+              {visible.length === 0 ? (
+                <p className="px-5 py-10 text-center text-sm text-slate-500">Nothing in the transcript matches “{query}”.</p>
+              ) : (
+                <ol className="divide-y divide-slate-100">
+                  {visible.map((s) => (
+                    <Utterance
+                      key={`${s.start}-${s.speaker}`}
+                      segment={s}
+                      transcript={transcript}
+                      speakers={speakers}
+                      active={currentTime >= s.start && currentTime < s.end}
+                      query={query.trim()}
+                      onSeek={onSeek}
+                    />
+                  ))}
+                </ol>
+              )}
+            </>
+          )}
+        </Card>
+      </Reveal>
+    </Stagger>
   );
 }
