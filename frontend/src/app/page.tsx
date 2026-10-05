@@ -1,14 +1,14 @@
 "use client";
 
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ChevronRight, FileDown, LoaderCircle } from "lucide-react";
+import { Braces, ChevronRight, FileDown, History, LoaderCircle, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Breadcrumb, Breadcrumbs, Link } from "react-aria-components";
 
-import { Button, focusRing } from "@/components/aria";
+import { Button, IconButton, focusRing } from "@/components/aria";
 import PipelineSteps, { type Stage } from "@/components/PipelineSteps";
 import ProcessingCard from "@/components/ProcessingCard";
-import RecentAnalyses from "@/components/RecentAnalyses";
+import RecentAnalyses, { type RecordActions } from "@/components/RecentAnalyses";
 import ScrollToggle from "@/components/ScrollToggle";
 import InterruptionsSection from "@/components/sections/InterruptionsSection";
 import LatencySection from "@/components/sections/LatencySection";
@@ -21,7 +21,15 @@ import { Alert, PageHeader } from "@/components/ui";
 import WhatHappensNext from "@/components/WhatHappensNext";
 import { analyzeRecording, downloadReportPdf } from "@/lib/api";
 import { buildSpeakerMeta } from "@/lib/format";
-import { loadHistory, prependHistory, type AnalysisRecord } from "@/lib/history";
+import {
+  downloadReportJson,
+  loadAnalysis,
+  loadHistory,
+  prependHistory,
+  removeHistory,
+  saveAnalysis,
+  type AnalysisRecord,
+} from "@/lib/history";
 import type { AnalysisReport } from "@/lib/types";
 
 const VIEW_TITLES: Record<View, string> = {
@@ -29,7 +37,10 @@ const VIEW_TITLES: Record<View, string> = {
   latency: "Response Latency",
   interruptions: "Interruptions",
   transcript: "Transcript",
+  history: "Past analyses",
 };
+
+const savedFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 export default function DashboardPage() {
   const [view, setView] = useState<View>("overview");
@@ -42,6 +53,10 @@ export default function DashboardPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
+  /** The past analysis being viewed, when it was reopened from the history. */
+  const [openedRecord, setOpenedRecord] = useState<AnalysisRecord | null>(null);
+  const [pdfPendingId, setPdfPendingId] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -63,10 +78,20 @@ export default function DashboardPage() {
     setHistory(loadHistory());
   }, []);
 
-  const recordRun = useCallback((record: Omit<AnalysisRecord, "id" | "uploadedAt">) => {
-    const uploadedAt = new Date().toISOString();
-    setHistory((list) => prependHistory(list, { ...record, id: `${uploadedAt}-${record.filename}`, uploadedAt }));
-  }, []);
+  /** Add a run to the history; completed runs also store their report and recording so they can be reopened. */
+  const recordRun = useCallback(
+    (record: Omit<AnalysisRecord, "id" | "uploadedAt">, saved?: { report: AnalysisReport; audio: File }) => {
+      const uploadedAt = new Date().toISOString();
+      const id = `${uploadedAt}-${record.filename}`;
+      const add = (extra: Partial<AnalysisRecord>) =>
+        setHistory((list) => prependHistory(list, { ...record, ...extra, id, uploadedAt }));
+      if (!saved) return add({});
+      void saveAnalysis(id, saved.report, saved.audio).then((stored) =>
+        add(stored ? { saved: true, hasAudio: stored.hasAudio } : {}),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     return () => {
@@ -87,6 +112,7 @@ export default function DashboardPage() {
     setError(null);
     setPdfError(null);
     setFailedAt(null);
+    setOpenedRecord(null);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
@@ -105,6 +131,8 @@ export default function DashboardPage() {
     setError(null);
     setPdfError(null);
     setFailedAt(null);
+    setOpenedRecord(null);
+    setHistoryError(null);
     setIsPlaying(false);
     setCurrentTime(0);
     setView("overview");
@@ -130,7 +158,7 @@ export default function DashboardPage() {
                 speakers: event.report.speaker_count,
                 language: event.report.transcript?.language_name ?? null,
                 status: "complete",
-              });
+              }, { report: event.report, audio: selected });
               break;
             case "error":
               throw new Error(event.detail);
@@ -162,6 +190,60 @@ export default function DashboardPage() {
     } finally {
       setPdfBusy(false);
     }
+  };
+
+  /** Load a past analysis's stored report, or explain why it can't be. */
+  const loadSaved = async (record: AnalysisRecord) => {
+    const saved = await loadAnalysis(record.id);
+    if (!saved) {
+      setHistoryError(
+        `The saved report for “${record.filename}” isn't available in this browser anymore (browser data may have been cleared).`,
+      );
+    }
+    return saved;
+  };
+
+  const recordActions: RecordActions = {
+    pdfPendingId,
+    onOpen: async (record) => {
+      setHistoryError(null);
+      const saved = await loadSaved(record);
+      if (!saved) return;
+      abortRef.current?.abort();
+      audioRef.current?.pause();
+      setFile(saved.audio);
+      setAudioUrl(saved.audio ? URL.createObjectURL(saved.audio) : null);
+      setReport(saved.report);
+      setError(null);
+      setPdfError(null);
+      setFailedAt(null);
+      setOpenedRecord(record);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      updateStage("done");
+      navigate("overview");
+    },
+    onDownloadPdf: async (record) => {
+      setHistoryError(null);
+      setPdfError(null);
+      const saved = await loadSaved(record);
+      if (!saved) return;
+      setPdfPendingId(record.id);
+      try {
+        await downloadReportPdf(saved.report);
+      } catch (err) {
+        setPdfError((err as Error).message);
+      } finally {
+        setPdfPendingId(null);
+      }
+    },
+    onDownloadJson: async (record) => {
+      setHistoryError(null);
+      const saved = await loadSaved(record);
+      if (saved) downloadReportJson(saved.report);
+    },
+    onDelete: (record) => setHistory((list) => removeHistory(list, record.id)),
   };
 
   const seek = useCallback((seconds: number) => {
@@ -197,7 +279,7 @@ export default function DashboardPage() {
     />
   );
 
-  const sidebarProps = { view, onNavigate: navigate, report, busy };
+  const sidebarProps = { view, onNavigate: navigate, report, busy, historyCount: history.length };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -235,6 +317,9 @@ export default function DashboardPage() {
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               {report && (
+                <IconButton icon={Braces} label="Download data (JSON)" onPress={() => downloadReportJson(report)} />
+              )}
+              {report && (
                 <Button variant="primary" onPress={exportPdf} isPending={pdfBusy}>
                   {pdfBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                   <span className="hidden sm:inline">{pdfBusy ? "Preparing PDF…" : "Download PDF"}</span>
@@ -244,7 +329,7 @@ export default function DashboardPage() {
               <ThemeToggle />
             </div>
           </div>
-          {file && view !== "overview" && <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">{player}</div>}
+          {file && view !== "overview" && view !== "history" && <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">{player}</div>}
         </div>
 
         <div className="mx-auto max-w-6xl space-y-6 px-4 pt-8 pb-24 sm:px-6 lg:px-8">
@@ -265,6 +350,11 @@ export default function DashboardPage() {
           {pdfError && (
             <div className="animate-fade-up">
               <Alert title="PDF export failed">{pdfError}</Alert>
+            </div>
+          )}
+          {historyError && (
+            <div className="animate-fade-up">
+              <Alert title="Couldn't open that analysis">{historyError}</Alert>
             </div>
           )}
 
@@ -291,7 +381,7 @@ export default function DashboardPage() {
 
                   {/* Dropping a file swaps the drop zone for the pipeline and player. */}
                   <AnimatePresence mode="wait" initial={false}>
-                    {file ? (
+                    {file || report ? (
                       <motion.div
                         key="loaded"
                         initial={{ opacity: 0, scale: 0.98, y: 8 }}
@@ -300,8 +390,27 @@ export default function DashboardPage() {
                         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                         className="space-y-6"
                       >
-                        <PipelineSteps stage={stage} failedAt={failedAt} />
-                        {player}
+                        {openedRecord ? (
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                            <p className="flex min-w-0 items-center gap-2.5 text-sm text-violet-900">
+                              <History className="h-4 w-4 shrink-0" />
+                              <span className="min-w-0">
+                                Viewing a saved analysis from{" "}
+                                <span className="font-semibold">{savedFormat.format(new Date(openedRecord.uploadedAt))}</span>
+                                {!file && " (the recording wasn't stored, so playback is unavailable)"}
+                              </span>
+                            </p>
+                            {!file && (
+                              <Button size="sm" onPress={reset}>
+                                <Plus className="h-3.5 w-3.5" />
+                                Analyze a new recording
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <PipelineSteps stage={stage} failedAt={failedAt} />
+                        )}
+                        {file && player}
                       </motion.div>
                     ) : (
                       <motion.div
@@ -338,7 +447,23 @@ export default function DashboardPage() {
                     )}
                   </AnimatePresence>
 
-                  <RecentAnalyses records={history} />
+                  <RecentAnalyses records={history} limit={5} onViewAll={() => navigate("history")} {...recordActions} />
+                </>
+              )}
+
+              {view === "history" && (
+                <>
+                  <PageHeader
+                    eyebrow="Conversation intelligence"
+                    title="Past analyses"
+                    description="Every recording analyzed in this browser. Open one to see its overview, latency, interruptions and transcript again, or download its report as a PDF or its raw data as JSON."
+                  />
+                  <RecentAnalyses
+                    records={history}
+                    title="All analyses"
+                    subtitle="Saved in this browser only. Other browsers and devices keep their own history."
+                    {...recordActions}
+                  />
                 </>
               )}
 

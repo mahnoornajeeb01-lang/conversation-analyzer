@@ -3,6 +3,7 @@
 import {
   AudioLines,
   CircleHelp,
+  History,
   Languages,
   LayoutDashboard,
   LoaderCircle,
@@ -26,7 +27,7 @@ import {
 import { Button, focusRing, IconButton } from "@/components/aria";
 import type { AnalysisReport } from "@/lib/types";
 
-export type View = "overview" | "latency" | "interruptions" | "transcript";
+export type View = "overview" | "latency" | "interruptions" | "transcript" | "history";
 
 interface NavItem {
   key: View;
@@ -35,6 +36,7 @@ interface NavItem {
 }
 
 const OVERVIEW: NavItem = { key: "overview", label: "Overview", icon: LayoutDashboard };
+const HISTORY: NavItem = { key: "history", label: "Past analyses", icon: History };
 
 const LAYERS: NavItem[] = [
   { key: "latency", label: "Response latency", icon: Timer },
@@ -64,6 +66,8 @@ interface SidebarProps {
   onNavigate: (view: View) => void;
   report: AnalysisReport | null;
   busy: boolean;
+  /** Number of saved analyses, shown on the Past analyses item. */
+  historyCount: number;
 }
 
 function Brand() {
@@ -130,8 +134,9 @@ function HelpDialog() {
   );
 }
 
-function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
+function SidebarContent({ view, onNavigate, report, busy, historyCount }: SidebarProps) {
   const badge = (key: View): string | null => {
+    if (key === "history") return historyCount ? String(historyCount) : null;
     if (!report) return null;
     switch (key) {
       case "latency":
@@ -146,7 +151,7 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
   };
 
   const renderItem = (item: NavItem) => {
-    const enabled = item.key === "overview" || Boolean(report);
+    const enabled = item.key === "overview" || item.key === "history" || Boolean(report);
     const active = view === item.key;
     const Icon = item.icon;
     const b = badge(item.key);
@@ -194,7 +199,10 @@ function SidebarContent({ view, onNavigate, report, busy }: SidebarProps) {
       <Brand />
 
       <nav aria-label="Main" className="scroll-thin isolate flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">{renderItem(OVERVIEW)}</ul>
+        <ul className="space-y-1">
+          {renderItem(OVERVIEW)}
+          {renderItem(HISTORY)}
+        </ul>
 
         <p className="mt-6 mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
           Analysis layers
