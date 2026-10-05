@@ -1,9 +1,11 @@
 """Speech-to-text: what each speaker said, and which language it was in.
 
-Uses faster-whisper (Whisper on CTranslate2, int8 on CPU). Whisper detects the spoken
-language and gives word timestamps; each word is then attributed to whichever diarized
-speaker was talking at that moment, and consecutive words from one speaker are joined
-into an utterance.
+Uses faster-whisper (Whisper on CTranslate2, int8 on CPU). The spoken language is
+detected across the whole recording (Whisper on its own only listens to the first 30
+seconds, so an English intro would label a French conversation English), and
+mixed-language recordings are transcribed window by window in each window's own
+language. Each word is then attributed to whichever diarized speaker was talking at that
+moment, and consecutive words from one speaker are joined into an utterance.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from typing import List, Optional, Sequence
 import numpy as np
 
 from app.core.config import settings
-from app.models.schema import SpeakerSegment, Transcript, TranscriptSegment
+from app.models.schema import LanguageShare, SpeakerSegment, Transcript, TranscriptSegment
 
 logger = logging.getLogger("conversation_analyzer.transcription")
 
@@ -26,6 +28,13 @@ SAMPLE_RATE = 16000
 UTTERANCE_GAP_SECONDS = 1.5
 UTTERANCE_MAX_SECONDS = 20.0
 SENTENCE_END = (".", "?", "!", "۔", "؟", "。", "？", "！")  # incl. Urdu/Arabic and CJK
+
+# Language detection: Whisper looks at 30 s at a time. Long recordings are sampled at up
+# to this many evenly spaced windows of speech. A language counts as spoken in the
+# recording when it averages at least this share across the windows.
+DETECTION_WINDOW_SECONDS = 30
+DETECTION_MAX_WINDOWS = 12
+SECONDARY_LANGUAGE_MIN_SHARE = 0.15
 
 _model = None
 _model_load_failed = False
@@ -138,14 +147,51 @@ def _group_words(words: List[tuple], speaker_segments: Sequence[SpeakerSegment])
     ]
 
 
+def _speech_only(audio: np.ndarray) -> np.ndarray:
+    """The recording with silence and music removed, so detection only hears speech."""
+    from faster_whisper.vad import get_speech_timestamps
+
+    stamps = get_speech_timestamps(audio)
+    if not stamps:
+        return audio
+    return np.concatenate([audio[s["start"]:s["end"]] for s in stamps])
+
+
+def _detect_languages(model, audio: np.ndarray) -> List[tuple]:
+    """Average Whisper's language probabilities over windows spread across the whole
+    recording. Returns [(code, share)], most spoken first."""
+    speech = _speech_only(audio)
+    window = DETECTION_WINDOW_SECONDS * SAMPLE_RATE
+    count = max(1, min(DETECTION_MAX_WINDOWS, len(speech) // window))
+    last_start = max(0, len(speech) - window)
+    starts = np.linspace(0, last_start, count).astype(int) if count > 1 else [0]
+
+    totals: dict = {}
+    for start in starts:
+        _, _, probs = model.detect_language(speech[start:start + window])
+        for code, p in probs:
+            totals[code] = totals.get(code, 0.0) + p / len(starts)
+    ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    logger.info(
+        "Languages across %d window(s): %s", len(starts), ", ".join(f"{c} {p:.2f}" for c, p in ranked[:3])
+    )
+    return ranked
+
+
 def transcribe(audio: np.ndarray, speaker_segments: Sequence[SpeakerSegment]) -> Transcript:
     """Transcribe 16 kHz mono audio and attribute the text to the diarized speakers."""
     model = _get_model()
     if model is None:
         raise TranscriptionUnavailable("The speech-to-text model could not be loaded.")
     try:
-        segments, info = model.transcribe(
+        ranked = _detect_languages(model, audio)
+        language, probability = ranked[0]
+        spoken = [(c, p) for c, p in ranked if p >= SECONDARY_LANGUAGE_MIN_SHARE] or ranked[:1]
+        segments, _ = model.transcribe(
             audio,
+            language=language,
+            # Mixed-language audio: detect the language again for every 30 s window.
+            multilingual=len(spoken) > 1,
             beam_size=settings.whisper_beam_size,
             word_timestamps=True,
             vad_filter=True,
@@ -163,11 +209,15 @@ def transcribe(audio: np.ndarray, speaker_segments: Sequence[SpeakerSegment]) ->
         raise TranscriptionUnavailable("Speech-to-text failed while processing the recording.") from exc
 
     utterances = _group_words(words, speaker_segments)
+    total = sum(p for _, p in spoken)
     return Transcript(
-        language=info.language,
-        language_name=LANGUAGE_NAMES.get(info.language, info.language),
-        language_probability=round(float(info.language_probability), 3),
-        right_to_left=info.language in RTL_LANGUAGES,
+        language=language,
+        language_name=LANGUAGE_NAMES.get(language, language),
+        language_probability=round(float(probability), 3),
+        right_to_left=language in RTL_LANGUAGES,
+        languages=[
+            LanguageShare(code=c, name=LANGUAGE_NAMES.get(c, c), share=round(p / total, 3)) for c, p in spoken
+        ],
         segments=utterances,
         word_count=sum(len(u.text.split()) for u in utterances),
         model=f"whisper-{settings.whisper_model}",

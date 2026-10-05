@@ -58,6 +58,13 @@ export interface TranscriptSegment {
   text: string;
 }
 
+export interface LanguageShare {
+  code: string;
+  name: string;
+  /** Estimated fraction of the speech in this language, 0–1. */
+  share: number;
+}
+
 export interface Transcript {
   /** ISO 639-1 code detected by Whisper, e.g. "en" or "ur". */
   language: string;
@@ -65,6 +72,9 @@ export interface Transcript {
   /** null when the analysis engine doesn't report it. */
   language_probability: number | null;
   right_to_left: boolean;
+  /** Every language heard, most spoken first; more than one means mixed-language audio.
+   *  Absent on reports from before this was detected. */
+  languages?: LanguageShare[];
   segments: TranscriptSegment[];
   word_count: number;
   model: string;

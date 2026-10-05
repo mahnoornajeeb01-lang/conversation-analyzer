@@ -6,7 +6,7 @@ import { Button as AriaButton, Input, SearchField } from "react-aria-components"
 
 import { Button, focusRing } from "@/components/aria";
 import { Card, EmptyState, MiniStat, PageHeader, SpeakerAvatar } from "@/components/ui";
-import { formatClock, speakerName, type SpeakerMeta } from "@/lib/format";
+import { formatClock, languageLabel, speakerName, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Transcript, TranscriptSegment } from "@/lib/types";
 import { Reveal, Stagger } from "@/components/motion";
 
@@ -149,6 +149,7 @@ export default function TranscriptSection({
 
   const confidence =
     transcript.language_probability == null ? null : Math.round(transcript.language_probability * 100);
+  const mixed = (transcript.languages?.length ?? 0) > 1;
 
   return (
     <Stagger root className="space-y-6">
@@ -158,8 +159,18 @@ export default function TranscriptSection({
 
       <Reveal>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <MiniStat label="Language" value={transcript.language_name} hint={transcript.language.toUpperCase() || undefined} />
-          {confidence == null ? (
+          <MiniStat
+            label={mixed ? "Languages" : "Language"}
+            value={languageLabel(transcript)}
+            hint={
+              mixed
+                ? transcript.languages!.map((l) => `${l.code.toUpperCase()} ${Math.round(l.share * 100)}%`).join(" · ")
+                : transcript.language.toUpperCase() || undefined
+            }
+          />
+          {mixed ? (
+            <MiniStat label="Main language" value={transcript.language_name} hint="mixed-language recording" />
+          ) : confidence == null ? (
             <MiniStat label="Speakers" value={new Set(transcript.segments.map((s) => s.speaker)).size} />
           ) : (
             <MiniStat label="Detection confidence" value={`${confidence}%`} hint={confidence < 70 ? "low: may be mixed languages" : "detected automatically"} />

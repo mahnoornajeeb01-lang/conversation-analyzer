@@ -144,7 +144,10 @@ function SidebarContent({ view, onNavigate, report, busy, historyCount }: Sideba
       case "interruptions":
         return String(report.interruption_count);
       case "transcript":
-        return report.transcript?.language ? report.transcript.language.toUpperCase() : null;
+        if (!report.transcript?.language) return null;
+        return (report.transcript.languages?.length ? report.transcript.languages.map((l) => l.code) : [report.transcript.language])
+          .join("+")
+          .toUpperCase();
       default:
         return null;
     }

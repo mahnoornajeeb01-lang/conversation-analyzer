@@ -105,6 +105,14 @@ class TranscriptSegment(BaseModel):
     text: str
 
 
+class LanguageShare(BaseModel):
+    """One language heard in the recording."""
+
+    code: str = Field(..., description="ISO 639-1 code, e.g. 'fr'")
+    name: str
+    share: float = Field(..., ge=0, le=1, description="Estimated fraction of the speech in this language")
+
+
 class Transcript(BaseModel):
     """What was said, with the detected spoken language."""
 
@@ -112,6 +120,10 @@ class Transcript(BaseModel):
     language_name: str
     language_probability: Optional[float] = Field(None, ge=0, le=1, description="None when the engine doesn't report it")
     right_to_left: bool = False
+    languages: List[LanguageShare] = Field(
+        default_factory=list,
+        description="Every language heard across the whole recording, most spoken first; more than one means mixed-language audio",
+    )
     segments: List[TranscriptSegment]
     word_count: int = 0
     model: str = ""

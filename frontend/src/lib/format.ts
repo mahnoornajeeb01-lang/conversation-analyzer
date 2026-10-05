@@ -1,4 +1,10 @@
-import type { AnalysisReport } from "./types";
+import type { AnalysisReport, Transcript } from "./types";
+
+/** "French", or "French + English" for mixed-language recordings. */
+export function languageLabel(transcript: Transcript): string {
+  const langs = transcript.languages ?? [];
+  return langs.length > 1 ? langs.map((l) => l.name).join(" + ") : transcript.language_name;
+}
 
 export function formatClock(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return "0:00";

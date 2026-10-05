@@ -354,7 +354,10 @@ class _Builder:
         # Transcript
         tr = r.transcript
         if tr is not None or r.transcript_error:
-            if tr and tr.language_probability is not None:
+            if tr and len(tr.languages) > 1:
+                mix = ", ".join(f"{l.name} {round(l.share * 100)}%" for l in tr.languages)
+                lead = f"Mixed languages: {mix} · {tr.word_count} words."
+            elif tr and tr.language_probability is not None:
                 lead = f"Detected language: {tr.language_name} ({round(tr.language_probability * 100)}% confidence) · {tr.word_count} words."
             elif tr:
                 lead = f"{tr.word_count} words."

@@ -8,7 +8,7 @@ import type { View } from "@/components/Sidebar";
 import Timeline, { CLASSIFICATION_META } from "@/components/Timeline";
 import { Utterance } from "@/components/sections/TranscriptSection";
 import { Card, Legend, SpeakerAvatar, StatCard } from "@/components/ui";
-import { formatClock, formatDuration, formatPercent, formatSeconds, type SpeakerMeta } from "@/lib/format";
+import { formatClock, formatDuration, formatPercent, formatSeconds, languageLabel, type SpeakerMeta } from "@/lib/format";
 import type { AnalysisReport, Classification } from "@/lib/types";
 import { Reveal, Stagger } from "@/components/motion";
 
@@ -88,7 +88,7 @@ export default function Overview({
           {report.transcript ? (
             <Card
               title="Transcript"
-              subtitle={`${report.transcript.language ? `${report.transcript.language_name} detected · ` : ""}${report.transcript.word_count.toLocaleString()} words`}
+              subtitle={`${report.transcript.language ? `${languageLabel(report.transcript)} detected · ` : ""}${report.transcript.word_count.toLocaleString()} words`}
               action={<DetailsLink onPress={() => onNavigate("transcript")} />}
               bodyClassName="p-0"
             >

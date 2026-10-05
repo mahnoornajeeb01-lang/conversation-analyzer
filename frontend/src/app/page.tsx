@@ -20,7 +20,7 @@ import UploadCard from "@/components/UploadCard";
 import { Alert, PageHeader } from "@/components/ui";
 import WhatHappensNext from "@/components/WhatHappensNext";
 import { analyzeRecording, downloadReportPdf } from "@/lib/api";
-import { buildSpeakerMeta } from "@/lib/format";
+import { buildSpeakerMeta, languageLabel } from "@/lib/format";
 import {
   downloadReportJson,
   loadAnalysis,
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                 filename: selected.name,
                 duration: event.report.total_duration,
                 speakers: event.report.speaker_count,
-                language: event.report.transcript?.language_name ?? null,
+                language: event.report.transcript ? languageLabel(event.report.transcript) : null,
                 status: "complete",
               }, { report: event.report, audio: selected });
               break;
